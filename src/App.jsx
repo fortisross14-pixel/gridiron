@@ -330,14 +330,9 @@ export default function App() {
 
     setWeekResults(prev => ({ ...prev, [currentWeek]: taggedResults }));
     setLeague(updatedLeague);
-    setWeekUiState('simulating');
-    setRevealCount(0);
-
-    for (let i = 1; i <= taggedResults.length; i++) {
-      await new Promise(res => setTimeout(res, 500));
-      setRevealCount(i);
-    }
-
+    // Skip the staggered reveal — show all results immediately.
+    // Set revealCount to the full count so every card renders as "revealed".
+    setRevealCount(taggedResults.length);
     setWeekUiState('done');
     const wasWeek = currentWeek;
     setCurrentWeek(currentWeek + 1);
