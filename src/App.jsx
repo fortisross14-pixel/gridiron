@@ -432,13 +432,39 @@ export default function App() {
     applyStatLines(tH, r.playerStatsHome);
     applyStatLines(tA, r.playerStatsAway);
 
-    // Animate quarter-by-quarter at 500ms (was 600 in old all-at-once flow).
+    // Generate random quarter-by-quarter scoring for drama.
+    // Each team's final score is distributed unevenly across 4 quarters
+    // so leads can swing — a team might be down 0-14 and storm back, or
+    // start 21-0 and administer a lead.
+    const distributeScore = (total) => {
+      if (total === 0) return [0, 0, 0, 0];
+      // Random weights for each quarter (0.4 to 1.6).
+      const weights = [0.4 + Math.random() * 1.2, 0.4 + Math.random() * 1.2,
+                       0.4 + Math.random() * 1.2, 0.4 + Math.random() * 1.2];
+      const sum = weights.reduce((a, b) => a + b, 0);
+      // Distribute the total proportionally, rounding to multiples of 3 or 7
+      // when possible to look like real scoring (FGs and TDs).
+      let raw = weights.map(w => (w / sum) * total);
+      let q = raw.map(x => Math.round(x));
+      let drift = q.reduce((a, b) => a + b, 0) - total;
+      // Adjust to make sum match exactly.
+      while (drift !== 0) {
+        const idx = Math.floor(Math.random() * 4);
+        if (drift > 0 && q[idx] > 0) { q[idx]--; drift--; }
+        else if (drift < 0)          { q[idx]++; drift++; }
+      }
+      return q;
+    };
+    const hPerQ = distributeScore(r.homeScore);
+    const aPerQ = distributeScore(r.awayScore);
+
     setPlayoffSimState({ gameIdx, quarter: 0, live: { h: 0, a: 0 } });
-    for (let q = 1; q <= 4; q++) {
+    let hRunning = 0, aRunning = 0;
+    for (let q = 0; q < 4; q++) {
       await new Promise(res => setTimeout(res, 500));
-      const liveH = Math.round((r.homeScore * q) / 4);
-      const liveA = Math.round((r.awayScore * q) / 4);
-      setPlayoffSimState({ gameIdx, quarter: q, live: { h: liveH, a: liveA } });
+      hRunning += hPerQ[q];
+      aRunning += aPerQ[q];
+      setPlayoffSimState({ gameIdx, quarter: q + 1, live: { h: hRunning, a: aRunning } });
     }
 
     const winner = r.homeScore > r.awayScore ? tH : tA;

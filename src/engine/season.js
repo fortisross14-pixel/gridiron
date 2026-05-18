@@ -1,28 +1,161 @@
-// ─── SEASON SCHEDULE ─────────────────────────────────────────────────────
-// Round-robin generator for 32 teams over 16 weeks (no byes).
-// Algorithm: rotation method — fix team 0, rotate others.
-export const generateSchedule = (teams) => {
-  const ids = teams.map(t => t.id);
-  const n = ids.length;
-  const rounds = [];
-  const arr = [...ids];
-  for (let r = 0; r < n - 1; r++) {
-    const round = [];
-    for (let i = 0; i < n / 2; i++) {
-      const home = arr[i];
-      const away = arr[n - 1 - i];
-      if (r % 2 === 0) round.push({ home, away });
-      else            round.push({ home: away, away: home });
-    }
-    rounds.push(round);
-    arr.splice(1, 0, arr.pop());
+import { shuffle } from './random.js';
+import { REGULAR_SEASON_WEEKS } from './constants.js';
+
+// ─── NFL-STYLE 16-WEEK SCHEDULE ──────────────────────────────────────────
+//
+//   Weeks 1-3:   Divisional round 1 (3 games per team, vs each div rival)
+//   Weeks 4-8:   5 same-conf, non-divisional games (rotation method)
+//   Weeks 9-13:  5 inter-conference games (rotation method)
+//   Weeks 14-16: Divisional round 2 (rematch, home/away flipped)
+//
+// Total: 6 div + 5 same-conf + 5 inter-conf = 16 games per team.
+// No byes; every team plays every week.
+//
+// Rotation method: split teams into two arrays, pair by index. Shift one
+// side by 1 each week to generate fresh matchups without repeats.
+
+const CONFS = ['AFC', 'NFC'];
+const DIVISIONS = ['East', 'North', 'South', 'West'];
+
+// ─── DIVISIONAL ROUND-ROBIN ──────────────────────────────────────────────
+// 4 teams (A B C D) play one full round-robin across 3 weeks:
+//   Week 1: A-B, C-D
+//   Week 2: A-C, B-D
+//   Week 3: A-D, B-C
+const divisionalPairings = (divTeams) => {
+  if (divTeams.length !== 4) return [[], [], []];
+  const [A, B, C, D] = divTeams;
+  return [
+    [{ home: A.id, away: B.id }, { home: C.id, away: D.id }],
+    [{ home: A.id, away: C.id }, { home: B.id, away: D.id }],
+    [{ home: A.id, away: D.id }, { home: B.id, away: C.id }],
+  ];
+};
+
+const buildDivisionalSchedule = (teams) => {
+  const byDiv = {};
+  teams.forEach(t => {
+    const k = `${t.conf} ${t.div}`;
+    byDiv[k] = byDiv[k] || [];
+    byDiv[k].push(t);
+  });
+  // Stable order within each division.
+  Object.keys(byDiv).forEach(k =>
+    byDiv[k].sort((a, b) => a.id.localeCompare(b.id))
+  );
+
+  const r1 = [[], [], []]; // weeks 1-3
+  const r2 = [[], [], []]; // weeks 14-16
+  Object.values(byDiv).forEach(divTeams => {
+    const pairings = divisionalPairings(divTeams);
+    pairings.forEach((weekPairs, idx) => {
+      // Round 1: as-is.
+      weekPairs.forEach(p => r1[idx].push(p));
+      // Round 2: flip home/away. Rotate week index by +2 so a team's
+      // 2nd matchup with a rival isn't a literal mirror of the 1st.
+      const flipped = weekPairs.map(p => ({ home: p.away, away: p.home }));
+      const r2Idx = (idx + 2) % 3;
+      flipped.forEach(p => r2[r2Idx].push(p));
+    });
+  });
+  return { r1, r2 };
+};
+
+// Deterministic seeded shuffle (so identical inputs across reloads
+// produce the same schedule for a given season).
+const seededShuffle = (arr, seed) => {
+  const out = [...arr];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = (seed + i * 31) % (i + 1);
+    [out[i], out[j]] = [out[j], out[i]];
   }
-  return rounds.slice(0, 16);
+  return out;
+};
+
+// ─── SAME-CONFERENCE BLOCK (5 weeks, rotation method) ────────────────────
+// For each conference: split the 4 divisions into 2 sides of 2 divs (8
+// teams per side). Pair sideA[i] vs sideB[(i + week) % 8]. Each team plays
+// 5 distinct opponents from the other-side divisions over 5 weeks. Since
+// sides are made of different divisions, no team plays a div rival.
+const buildSameConfWeeks = (teams, seasonNum) => {
+  const weeks = [[], [], [], [], []];
+  CONFS.forEach((conf, confIdx) => {
+    const confTeams = teams.filter(t => t.conf === conf);
+    // Pick which 2 divisions go on side A; vary by season+conf.
+    const divs = seededShuffle([...DIVISIONS], (seasonNum - 1) * 7 + confIdx * 3);
+    const sideADivs = divs.slice(0, 2);
+    const sideBDivs = divs.slice(2);
+
+    const sideA = confTeams.filter(t => sideADivs.includes(t.div))
+      .sort((a, b) => a.id.localeCompare(b.id));
+    const sideB = confTeams.filter(t => sideBDivs.includes(t.div))
+      .sort((a, b) => a.id.localeCompare(b.id));
+
+    for (let week = 0; week < 5; week++) {
+      for (let i = 0; i < 8; i++) {
+        const j = (i + week) % 8;
+        const homeIsA = (i + j + week) % 2 === 0;
+        const home = homeIsA ? sideA[i].id : sideB[j].id;
+        const away = homeIsA ? sideB[j].id : sideA[i].id;
+        weeks[week].push({ home, away });
+      }
+    }
+  });
+  return weeks;
+};
+
+// ─── INTER-CONFERENCE BLOCK (5 weeks, rotation method) ───────────────────
+// Sort AFC and NFC randomly per season. Week k: AFC[i] vs NFC[(i+k) % 16].
+const buildInterConfWeeks = (teams, seasonNum) => {
+  const afc = teams.filter(t => t.conf === 'AFC');
+  const nfc = teams.filter(t => t.conf === 'NFC');
+  const afcOrdered = seededShuffle(afc, (seasonNum - 1) * 11);
+  const nfcOrdered = seededShuffle(nfc, (seasonNum - 1) * 13 + 1);
+
+  const weeks = [[], [], [], [], []];
+  for (let week = 0; week < 5; week++) {
+    for (let i = 0; i < 16; i++) {
+      const j = (i + week) % 16;
+      const homeIsAFC = (i + j + week) % 2 === 0;
+      const home = homeIsAFC ? afcOrdered[i].id : nfcOrdered[j].id;
+      const away = homeIsAFC ? nfcOrdered[j].id : afcOrdered[i].id;
+      weeks[week].push({ home, away });
+    }
+  }
+  return weeks;
+};
+
+// ─── PUBLIC: GENERATE FULL 16-WEEK SCHEDULE ──────────────────────────────
+export const generateSchedule = (teams, seasonNum = 1, _unused = null) => {
+  const { r1, r2 } = buildDivisionalSchedule(teams);
+  const sameConf  = buildSameConfWeeks(teams, seasonNum);
+  const interConf = buildInterConfWeeks(teams, seasonNum);
+
+  return [
+    ...r1,         // weeks 1-3
+    ...sameConf,   // weeks 4-8
+    ...interConf,  // weeks 9-13
+    ...r2,         // weeks 14-16
+  ];
+};
+
+// ─── LEGACY HELPER (no longer used by scheduler; kept for compatibility) ──
+export const standingsByDivisionPlace = (teams) => {
+  const out = new Map();
+  CONFS.forEach(conf => {
+    DIVISIONS.forEach(div => {
+      const inDiv = teams.filter(t => t.conf === conf && t.div === div)
+        .sort((a, b) =>
+          b.record.w - a.record.w ||
+          (b.record.pf - b.record.pa) - (a.record.pf - a.record.pa)
+        );
+      inDiv.forEach((t, i) => out.set(t.id, i));
+    });
+  });
+  return out;
 };
 
 // ─── PLAYOFF SEEDING ─────────────────────────────────────────────────────
-// 7 seeds per conference: 4 division winners + 3 wild cards.
-// Tiebreakers: wins, then point differential.
 export const seedPlayoffs = (teamsList) => {
   const byConf = { AFC: [], NFC: [] };
   teamsList.forEach(t => byConf[t.conf].push(t));
@@ -53,7 +186,6 @@ export const seedPlayoffs = (teamsList) => {
 };
 
 // ─── HELPER: find player anywhere in the league ──────────────────────────
-// Returns a copy of the player with currentTeamId attached, or null.
 export const findPlayerById = (league, freeAgents, id) => {
   for (const t of league) {
     if (t.roster.qb?.id === id)    return { ...t.roster.qb,    currentTeamId: t.id };
@@ -69,7 +201,6 @@ export const findPlayerById = (league, freeAgents, id) => {
 };
 
 // ─── HELPER: rotate "current momentum" tier swaps each offseason ────────
-// Each adjacent tier pair swaps one randomly chosen team.
 export const rotateCurrent = (league) => {
   const byTier = { Dynasty: [], Candidate: [], Mid: [], Low: [], Bottom: [] };
   league.forEach(t => byTier[t.current.tier].push(t.id));

@@ -26,6 +26,7 @@ const DivisionCard = ({ divLabel, teams, clinched, onSelectTeam }) => (
           <th style={styles.th}>Team</th>
           <th style={styles.thNum}>W</th>
           <th style={styles.thNum}>L</th>
+          <th style={styles.thNum}>T</th>
           <th style={styles.thNum}>PF</th>
           <th style={styles.thNum}>PA</th>
           <th style={styles.thNum}>DIFF</th>
@@ -49,6 +50,10 @@ const DivisionCard = ({ divLabel, teams, clinched, onSelectTeam }) => (
               </td>
               <td style={styles.tdNum}>{t.record.w}</td>
               <td style={styles.tdNum}>{t.record.l}</td>
+              <td style={{
+                ...styles.tdNum,
+                opacity: (t.record.t || 0) === 0 ? 0.3 : 1,
+              }}>{t.record.t || 0}</td>
               <td style={styles.tdNum}>{t.record.pf}</td>
               <td style={styles.tdNum}>{t.record.pa}</td>
               <td style={{ ...styles.tdNum,
@@ -155,7 +160,7 @@ export const StandingsTab = ({ league, currentWeek, onSelectTeam }) => {
                     <tr>
                       <th style={styles.thNum}>#</th>
                       <th style={styles.th}>Team</th>
-                      <th style={styles.thNum}>W-L</th>
+                      <th style={styles.thNum}>W-L-T</th>
                       <th style={styles.thNum}>PF</th>
                       <th style={styles.thNum}>PA</th>
                       <th style={styles.thNum}>DIFF</th>
@@ -184,7 +189,7 @@ export const StandingsTab = ({ league, currentWeek, onSelectTeam }) => {
                               }}>x</span>
                             )}
                           </td>
-                          <td style={styles.tdNum}>{t.record.w}-{t.record.l}</td>
+                          <td style={styles.tdNum}>{t.record.w}-{t.record.l}{(t.record.t || 0) > 0 ? `-${t.record.t}` : ''}</td>
                           <td style={styles.tdNum}>{t.record.pf}</td>
                           <td style={styles.tdNum}>{t.record.pa}</td>
                           <td style={{ ...styles.tdNum,
