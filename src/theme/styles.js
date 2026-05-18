@@ -9,18 +9,17 @@ export const styles = {
     background: COLORS.bg,
     color: COLORS.text,
     fontFamily: "'Oswald', sans-serif",
-    backgroundImage:
-      'radial-gradient(circle at 20% 0%, rgba(34, 197, 94, 0.08) 0%, transparent 50%), ' +
-      'radial-gradient(circle at 80% 100%, rgba(59, 130, 246, 0.06) 0%, transparent 50%)',
   },
   header: {
-    padding: '20px 28px',
+    padding: '16px 28px',
+    background: COLORS.panel,
     borderBottom: `1px solid ${COLORS.border}`,
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
     flexWrap: 'wrap',
     gap: 16,
+    boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
   },
   headerLeft: { display: 'flex', alignItems: 'center', gap: 24 },
   logo:       { display: 'flex', alignItems: 'baseline', gap: 8, cursor: 'pointer' },
@@ -81,7 +80,7 @@ export const styles = {
   statRow:    { display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' },
   tierPill: {
     fontSize: 10, fontWeight: 700, padding: '4px 10px', borderRadius: 12,
-    color: COLORS.bg, letterSpacing: 0.8, textTransform: 'uppercase',
+    color: COLORS.text, letterSpacing: 0.8, textTransform: 'uppercase',
   },
   momentumBar: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
@@ -100,7 +99,7 @@ export const styles = {
     transition: 'all 0.2s',
     width: '100%',
     fontWeight: 700,
-    boxShadow: '0 4px 12px rgba(34,197,94,0.25)',
+    boxShadow: '0 4px 12px rgba(213,10,10,0.25)',
   },
   backBtn: {
     background: 'none', border: `1px solid ${COLORS.borderMute}`, color: COLORS.textMute,
@@ -124,11 +123,11 @@ export const styles = {
   },
   rosterGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
   playerCard: {
-    background: COLORS.bg, border: '2px solid', borderRadius: 8, padding: 14,
+    background: COLORS.panelDeep, border: '2px solid', borderRadius: 8, padding: 14,
   },
   rarityBadge: {
     fontSize: 10, fontWeight: 700, padding: '4px 9px', borderRadius: 12,
-    color: COLORS.bg, letterSpacing: 0.8, display: 'inline-block', textTransform: 'uppercase',
+    color: COLORS.textOnDark, letterSpacing: 0.8, display: 'inline-block', textTransform: 'uppercase',
   },
   weekHeader: {
     fontFamily: "'Bebas Neue'", fontSize: 22, letterSpacing: 3,

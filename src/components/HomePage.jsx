@@ -1,15 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { styles } from '../theme/styles.js';
 import { COLORS } from '../theme/colors.js';
-import { listSaves, deleteSave, timeAgo, SLOT_COUNT } from '../state/saves.js';
+import { listSaves, deleteSave, timeAgo, exportSave, importSave, SLOT_COUNT } from '../state/saves.js';
 
 // ─── HOME PAGE ───────────────────────────────────────────────────────────
 // Shown when the app first loads. Lists 3 save slots and lets the user
-// either continue an existing league or create a new one.
+// either continue an existing league, create a new one, or import a backup.
 export const HomePage = ({ onLoad, onNew }) => {
   const [slots, setSlots] = useState([]);
-  const [newSlotIdx, setNewSlotIdx] = useState(null); // which slot is being created
+  const [newSlotIdx, setNewSlotIdx] = useState(null);
   const [newName, setNewName] = useState('');
+  const [importTargetIdx, setImportTargetIdx] = useState(null);
+  const [importError, setImportError] = useState('');
+  const importInputRef = useRef(null);
 
   const refresh = () => setSlots(listSaves());
   useEffect(() => { refresh(); }, []);
@@ -28,6 +31,32 @@ export const HomePage = ({ onLoad, onNew }) => {
     setNewName('');
   };
 
+  const triggerImport = (slotIdx) => {
+    setImportTargetIdx(slotIdx);
+    setImportError('');
+    // Reset value so the same file can be re-selected.
+    if (importInputRef.current) importInputRef.current.value = '';
+    importInputRef.current?.click();
+  };
+
+  const handleImportFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || importTargetIdx === null) return;
+    // If slot is non-empty, confirm overwrite.
+    if (slots[importTargetIdx] && !confirm(`Slot ${importTargetIdx + 1} already has a save. Overwrite it?`)) {
+      setImportTargetIdx(null);
+      return;
+    }
+    const result = await importSave(importTargetIdx, file);
+    if (result.ok) {
+      refresh();
+      setImportError('');
+    } else {
+      setImportError(result.error);
+    }
+    setImportTargetIdx(null);
+  };
+
   return (
     <div style={styles.app}>
       <style>{`* { box-sizing: border-box; } body { margin: 0; }`}</style>
@@ -37,23 +66,23 @@ export const HomePage = ({ onLoad, onNew }) => {
           <div style={{
             display: 'inline-flex', alignItems: 'center', gap: 12,
             padding: '6px 14px', borderRadius: 20,
-            background: 'rgba(34,197,94,0.1)',
-            border: `1px solid rgba(34,197,94,0.3)`,
+            background: 'rgba(213,10,10,0.08)',
+            border: `1px solid rgba(213,10,10,0.25)`,
             marginBottom: 24,
-            fontSize: 11, letterSpacing: 2, color: COLORS.accent,
+            fontSize: 11, letterSpacing: 2, color: COLORS.accent, fontWeight: 700,
           }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: COLORS.accent }} />
             NFL SEASON SIMULATOR
           </div>
           <div style={{
-            fontFamily: "'Bebas Neue'", fontSize: 88, letterSpacing: 8,
+            fontFamily: "'Bebas Neue'", fontSize: 88, letterSpacing: 6,
             lineHeight: 0.95, color: COLORS.text,
-            textShadow: '0 4px 24px rgba(0,0,0,0.4)',
           }}>
             GRIDIRON
           </div>
           <div style={{
-            fontSize: 13, letterSpacing: 4, opacity: 0.5, marginTop: 12,
+            fontSize: 12, letterSpacing: 3, color: COLORS.textMute, marginTop: 12,
+            fontWeight: 600,
           }}>
             PICK A LEAGUE TO CONTINUE OR START A NEW ONE
           </div>
@@ -126,21 +155,21 @@ export const HomePage = ({ onLoad, onNew }) => {
               return (
                 <div
                   key={idx}
-                  onClick={() => setNewSlotIdx(idx)}
                   style={{
                     ...styles.detailCard,
                     padding: 24,
                     minHeight: 180,
-                    cursor: 'pointer',
                     border: `2px dashed ${COLORS.borderMute}`,
                     background: 'transparent',
+                    boxShadow: 'none',
                     display: 'flex', flexDirection: 'column',
                     alignItems: 'center', justifyContent: 'center',
+                    gap: 12,
                     transition: 'all 0.15s',
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.borderColor = COLORS.accent;
-                    e.currentTarget.style.background = 'rgba(34,197,94,0.04)';
+                    e.currentTarget.style.background = 'rgba(213,10,10,0.04)';
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.borderColor = COLORS.borderMute;
@@ -148,11 +177,24 @@ export const HomePage = ({ onLoad, onNew }) => {
                   }}
                 >
                   <div style={{
-                    fontSize: 11, letterSpacing: 2, opacity: 0.5, marginBottom: 8,
+                    fontSize: 11, letterSpacing: 2, color: COLORS.textMute, fontWeight: 700,
                   }}>SLOT {idx + 1}</div>
-                  <div style={{
-                    fontSize: 28, color: COLORS.accent, fontWeight: 300,
-                  }}>+ NEW LEAGUE</div>
+                  <button
+                    onClick={() => setNewSlotIdx(idx)}
+                    style={{
+                      background: 'none', border: 'none',
+                      fontSize: 24, color: COLORS.accent, fontWeight: 700,
+                      cursor: 'pointer', fontFamily: "'Bebas Neue'", letterSpacing: 2,
+                    }}
+                  >+ NEW LEAGUE</button>
+                  <button
+                    onClick={() => triggerImport(idx)}
+                    style={{
+                      background: 'none', border: 'none',
+                      fontSize: 11, color: COLORS.textMute, letterSpacing: 1.5,
+                      cursor: 'pointer', textDecoration: 'underline', fontWeight: 600,
+                    }}
+                  >or import a backup</button>
                 </div>
               );
             }
@@ -243,41 +285,98 @@ export const HomePage = ({ onLoad, onNew }) => {
                   </div>
                 </div>
 
-                {/* DELETE BUTTON — stops click bubbling to the load action */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDelete(idx, slot.name);
-                  }}
-                  style={{
-                    position: 'absolute',
-                    top: 10, right: 10,
-                    background: 'transparent',
-                    border: `1px solid ${COLORS.borderMute}`,
-                    color: COLORS.textMute,
-                    width: 24, height: 24, padding: 0,
-                    borderRadius: 3, cursor: 'pointer',
-                    fontFamily: "'Oswald'", fontSize: 12, lineHeight: 1,
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = COLORS.danger;
-                    e.currentTarget.style.color = COLORS.danger;
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = COLORS.borderMute;
-                    e.currentTarget.style.color = COLORS.textMute;
-                  }}
-                  title="Delete this league"
-                >✕</button>
+                {/* ACTION BUTTONS — top-right, stop click bubbling */}
+                <div style={{
+                  position: 'absolute', top: 10, right: 10,
+                  display: 'flex', gap: 6,
+                }}>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      exportSave(idx);
+                    }}
+                    style={{
+                      background: 'transparent',
+                      border: `1px solid ${COLORS.borderMute}`,
+                      color: COLORS.textMute,
+                      width: 28, height: 28, padding: 0,
+                      borderRadius: 6, cursor: 'pointer',
+                      fontSize: 14, lineHeight: 1,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = COLORS.info;
+                      e.currentTarget.style.color = COLORS.info;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = COLORS.borderMute;
+                      e.currentTarget.style.color = COLORS.textMute;
+                    }}
+                    title="Export this league as a backup file"
+                  >⬇</button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(idx, slot.name);
+                    }}
+                    style={{
+                      background: 'transparent',
+                      border: `1px solid ${COLORS.borderMute}`,
+                      color: COLORS.textMute,
+                      width: 28, height: 28, padding: 0,
+                      borderRadius: 6, cursor: 'pointer',
+                      fontFamily: "'Oswald'", fontSize: 13, lineHeight: 1,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = COLORS.danger;
+                      e.currentTarget.style.color = COLORS.danger;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = COLORS.borderMute;
+                      e.currentTarget.style.color = COLORS.textMute;
+                    }}
+                    title="Delete this league"
+                  >✕</button>
+                </div>
               </div>
             );
           })}
         </div>
 
+        {/* IMPORT ERROR TOAST */}
+        {importError && (
+          <div style={{
+            marginTop: 16, padding: 12,
+            background: 'rgba(220,38,38,0.08)',
+            border: `1px solid ${COLORS.danger}`,
+            borderRadius: 8,
+            color: COLORS.danger,
+            fontSize: 13, fontWeight: 600,
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          }}>
+            <span><strong>Import failed:</strong> {importError}</span>
+            <button onClick={() => setImportError('')} style={{
+              background: 'none', border: 'none', color: COLORS.danger,
+              fontSize: 18, cursor: 'pointer', padding: '0 8px', lineHeight: 1,
+            }}>✕</button>
+          </div>
+        )}
+
+        {/* HIDDEN FILE INPUT — triggered by Import buttons */}
+        <input
+          ref={importInputRef}
+          type="file"
+          accept="application/json,.json"
+          onChange={handleImportFile}
+          style={{ display: 'none' }}
+        />
+
         <div style={{
-          marginTop: 32, textAlign: 'center', fontSize: 11, opacity: 0.4, letterSpacing: 1,
+          marginTop: 32, textAlign: 'center', fontSize: 11, color: COLORS.textMute,
+          letterSpacing: 1, lineHeight: 1.7,
         }}>
-          Saves are stored in this browser. Clearing site data will erase them.
+          Saves are stored in this browser. Clearing site data will erase them.<br/>
+          <strong style={{ color: COLORS.text }}>Add to Home Screen</strong> for the most durable storage,
+          or use ⬇ to export a backup.
         </div>
       </div>
     </div>

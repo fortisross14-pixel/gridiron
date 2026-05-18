@@ -4,17 +4,17 @@ import { COLORS } from '../../theme/colors.js';
 import { SectionTitle } from '../shared/SectionTitle.jsx';
 
 const LEGACY_COLORS = {
-  'Best Ever':  '#FBBF24',
-  'Classics':   '#C084FC',
-  'Historical': '#60A5FA',
-  'Normal':     '#9CA3AF',
+  'Best Ever':  { bg: '#FBBF24', text: '#0F172A' }, // gold + dark
+  'Classics':   { bg: '#9333EA', text: '#FFFFFF' }, // purple + white
+  'Historical': { bg: '#2563EB', text: '#FFFFFF' }, // blue + white
+  'Normal':     { bg: '#9CA3AF', text: '#0F172A' }, // grey + dark
 };
 const CURRENT_COLORS = {
-  'Dynasty':   '#22c55e',
-  'Candidate': '#84cc16',
-  'Mid':       '#eab308',
-  'Low':       '#f97316',
-  'Bottom':    '#ef4444',
+  'Dynasty':   { bg: '#16A34A', text: '#FFFFFF' }, // green + white
+  'Candidate': { bg: '#65A30D', text: '#FFFFFF' }, // lime + white
+  'Mid':       { bg: '#CA8A04', text: '#FFFFFF' }, // amber + white
+  'Low':       { bg: '#EA580C', text: '#FFFFFF' }, // orange + white
+  'Bottom':    { bg: '#DC2626', text: '#FFFFFF' }, // red + white
 };
 
 const TeamCard = ({ team, rank, onClick }) => {
@@ -36,10 +36,16 @@ const TeamCard = ({ team, rank, onClick }) => {
           <span style={styles.recordSub}>{team.div} · {team.conf}</span>
         </div>
         <div style={styles.statRow}>
-          <span style={{ ...styles.tierPill, background: LEGACY_COLORS[team.legacy.tier] }}>
+          <span style={{ ...styles.tierPill,
+            background: LEGACY_COLORS[team.legacy.tier].bg,
+            color:      LEGACY_COLORS[team.legacy.tier].text,
+          }}>
             {team.legacy.tier} +{team.legacy.value}
           </span>
-          <span style={{ ...styles.tierPill, background: CURRENT_COLORS[team.current.tier] }}>
+          <span style={{ ...styles.tierPill,
+            background: CURRENT_COLORS[team.current.tier].bg,
+            color:      CURRENT_COLORS[team.current.tier].text,
+          }}>
             {team.current.tier} +{team.current.value}
           </span>
         </div>

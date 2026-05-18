@@ -1,5 +1,5 @@
 import { styles } from '../../theme/styles.js';
-import { COLORS, RARITY_COLOR } from '../../theme/colors.js';
+import { COLORS, RARITY_COLOR, rarityStyle } from '../../theme/colors.js';
 
 const GameStatLine = ({ player, stats, onClick }) => {
   const renderStat = () => {
@@ -17,7 +17,7 @@ const GameStatLine = ({ player, stats, onClick }) => {
       display: 'flex', alignItems: 'center', gap: 10, padding: '8px 4px',
       borderBottom: `1px solid ${COLORS.border}`, cursor: 'pointer', fontSize: 12,
     }}>
-      <span style={{ ...styles.rarityBadge, background: RARITY_COLOR[player.rarity], fontSize: 9 }}>
+      <span style={{ ...styles.rarityBadge, ...rarityStyle(player.rarity), fontSize: 9 }}>
         {player.position === 'HC' ? 'HC' : player.position}
       </span>
       <span style={{ flex: 1, fontWeight: 600 }}>{player.name}</span>
@@ -112,7 +112,7 @@ export const GameDetail = ({ game, week, league, onBack, onPlayerClick, onTeamCl
             <div style={{ fontSize: 11, opacity: 0.5, marginTop: 4 }}>{away.record.w}-{away.record.l}</div>
           </div>
         </div>
-        <div style={{ marginTop: 16, padding: 10, background: COLORS.bg, borderRadius: 4, fontSize: 13 }}>
+        <div style={{ marginTop: 16, padding: 10, background: COLORS.panelDeep, borderRadius: 6, fontSize: 13 }}>
           <span style={{ opacity: 0.5, marginRight: 8 }}>MVP</span>
           <span style={{ fontWeight: 700 }}>{game.mvp}</span>
         </div>

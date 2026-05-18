@@ -13,6 +13,7 @@ import { rand } from './engine/random.js';
 import { REGULAR_SEASON_WEEKS } from './engine/constants.js';
 import { writeSave, loadSave } from './state/saves.js';
 import { styles, globalCSS } from './theme/styles.js';
+import { COLORS } from './theme/colors.js';
 import { Header }       from './components/shared/Header.jsx';
 import { HomePage }     from './components/HomePage.jsx';
 import { WeeklyTab }    from './components/tabs/WeeklyTab.jsx';
@@ -176,7 +177,7 @@ export default function App() {
 
   if (!league || !freeAgents) {
     return (
-      <div style={{ padding: 40, color: '#fff', background: '#0a0e1a', minHeight: '100vh' }}>
+      <div style={{ padding: 40, color: COLORS.text, background: COLORS.bg, minHeight: '100vh' }}>
         Loading league...
       </div>
     );

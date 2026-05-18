@@ -1,5 +1,5 @@
 import { styles } from '../../theme/styles.js';
-import { COLORS, RARITY_COLOR } from '../../theme/colors.js';
+import { COLORS, RARITY_COLOR, rarityStyle } from '../../theme/colors.js';
 import { SectionTitle } from '../shared/SectionTitle.jsx';
 
 const labelStyle = { fontSize: 10, letterSpacing: 2, opacity: 0.5 };
@@ -83,7 +83,7 @@ export const HistoryTab = ({ history }) => (
           {entry.draftPick1 && (
             <HistoryAward label="#1 DRAFT PICK">
               {entry.draftPick1.name}{' '}
-              <span style={{ ...styles.rarityBadge, background: RARITY_COLOR[entry.draftPick1.rarity], fontSize: 9 }}>
+              <span style={{ ...styles.rarityBadge, ...rarityStyle(entry.draftPick1.rarity), fontSize: 9 }}>
                 {entry.draftPick1.rarity}
               </span>
               <span style={{ opacity: 0.6, fontSize: 11 }}> · {entry.draftPick1.position} · {entry.draftPick1.teamId}</span>

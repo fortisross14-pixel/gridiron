@@ -67,6 +67,50 @@ export const deleteSave = (slot) => {
   }
 };
 
+// ─── EXPORT / IMPORT ────────────────────────────────────────────────────
+// Manual backup escape hatch. Export downloads a slot as a .json file.
+// Import reads a file and writes it to the chosen slot.
+
+export const exportSave = (slot) => {
+  const raw = readSlot(slot);
+  if (!raw) return false;
+  const name = raw.meta?.name || `Slot ${slot + 1}`;
+  const safeName = name.replace(/[^a-z0-9-]/gi, '_').slice(0, 40);
+  const blob = new Blob([JSON.stringify(raw, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `gridiron-${safeName}-S${raw.meta?.seasonNum || 1}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return true;
+};
+
+// Returns { ok: true, meta } on success, { ok: false, error } otherwise.
+// Caller is responsible for prompting the user if the slot is non-empty.
+export const importSave = async (slot, file) => {
+  try {
+    const text = await file.text();
+    const parsed = JSON.parse(text);
+    if (!parsed || typeof parsed !== 'object') {
+      return { ok: false, error: 'File is not valid JSON.' };
+    }
+    if (parsed.schemaVersion !== SAVE_SCHEMA_VERSION) {
+      return { ok: false, error: `Save is schema v${parsed.schemaVersion}; this app expects v${SAVE_SCHEMA_VERSION}.` };
+    }
+    if (!parsed.meta || !parsed.state) {
+      return { ok: false, error: 'File is missing meta or state.' };
+    }
+    // Write directly via setItem so we preserve the savedAt timestamp.
+    localStorage.setItem(KEY(slot), JSON.stringify(parsed));
+    return { ok: true, meta: parsed.meta };
+  } catch (err) {
+    return { ok: false, error: err?.message || 'Failed to read file.' };
+  }
+};
+
 // Human-readable "5 minutes ago", "2 hours ago", "yesterday", "3 days ago".
 export const timeAgo = (ts) => {
   if (!ts) return '';

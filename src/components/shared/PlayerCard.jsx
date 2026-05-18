@@ -1,5 +1,5 @@
 import { styles } from '../../theme/styles.js';
-import { RARITY_COLOR } from '../../theme/colors.js';
+import { RARITY_COLOR, rarityStyle } from '../../theme/colors.js';
 import { COACH_SPECIALTY_COLOR } from '../../data/specialties.js';
 
 export const PlayerCard = ({ player, onClick }) => (
@@ -23,7 +23,7 @@ export const PlayerCard = ({ player, onClick }) => (
           </div>
         )}
       </div>
-      <div style={{ ...styles.rarityBadge, background: RARITY_COLOR[player.rarity] }}>
+      <div style={{ ...styles.rarityBadge, ...rarityStyle(player.rarity) }}>
         {player.rarity}
       </div>
     </div>

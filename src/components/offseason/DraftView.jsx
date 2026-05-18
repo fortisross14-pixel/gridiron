@@ -1,5 +1,5 @@
 import { styles } from '../../theme/styles.js';
-import { RARITY_COLOR } from '../../theme/colors.js';
+import { RARITY_COLOR, rarityStyle } from '../../theme/colors.js';
 import { SectionTitle } from '../shared/SectionTitle.jsx';
 import { makePlayer } from '../../engine/factory.js';
 import { rand, choice, generateRarity } from '../../engine/random.js';
@@ -136,7 +136,7 @@ export const DraftView = ({ data, setData, league, setLeague, freeAgents, setFre
               <div key={i} style={styles.faRow}>
                 <span style={{ fontSize: 11, opacity: 0.5, width: 24 }}>#{i + 1}</span>
                 <span style={{ width: 40, opacity: 0.7 }}>{p.team}</span>
-                <span style={{ ...styles.rarityBadge, background: RARITY_COLOR[p.player.rarity], fontSize: 9 }}>
+                <span style={{ ...styles.rarityBadge, ...rarityStyle(p.player.rarity), fontSize: 9 }}>
                   {p.player.rarity}
                 </span>
                 <span style={{ flex: 1 }}>

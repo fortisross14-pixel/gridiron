@@ -1,5 +1,5 @@
 import { styles } from '../../theme/styles.js';
-import { RARITY_COLOR } from '../../theme/colors.js';
+import { RARITY_COLOR, rarityStyle } from '../../theme/colors.js';
 import { SectionTitle } from '../shared/SectionTitle.jsx';
 import { DraftView } from './DraftView.jsx';
 import { makePlayer } from '../../engine/factory.js';
@@ -11,7 +11,7 @@ const RetireRow = ({ item, league }) => {
   const t = league.find(x => x.id === item.team);
   return (
     <div style={styles.faRow}>
-      <span style={{ ...styles.rarityBadge, background: RARITY_COLOR[item.player.rarity], fontSize: 9 }}>
+      <span style={{ ...styles.rarityBadge, ...rarityStyle(item.player.rarity), fontSize: 9 }}>
         {item.player.rarity}
       </span>
       <span style={{ flex: 1 }}>
@@ -87,7 +87,7 @@ export const OffseasonView = ({
             const t = league.find(x => x.id === r.team);
             return (
               <div key={i} style={styles.faRow}>
-                <span style={{ ...styles.rarityBadge, background: RARITY_COLOR[r.player.rarity], fontSize: 9 }}>
+                <span style={{ ...styles.rarityBadge, ...rarityStyle(r.player.rarity), fontSize: 9 }}>
                   {r.player.rarity}
                 </span>
                 <span style={{ flex: 1 }}>
@@ -142,7 +142,7 @@ export const OffseasonView = ({
               <div style={styles.tradeSide}>
                 <div style={{ fontSize: 11, letterSpacing: 1, opacity: 0.5 }}>{t.from}</div>
                 <div style={{ marginTop: 4 }}>
-                  <span style={{ ...styles.rarityBadge, background: RARITY_COLOR[t.give.rarity], fontSize: 9, marginRight: 6 }}>
+                  <span style={{ ...styles.rarityBadge, ...rarityStyle(t.give.rarity), fontSize: 9, marginRight: 6 }}>
                     {t.give.rarity}
                   </span>
                   {t.give.name} ({t.give.position})
@@ -152,7 +152,7 @@ export const OffseasonView = ({
               <div style={styles.tradeSide}>
                 <div style={{ fontSize: 11, letterSpacing: 1, opacity: 0.5 }}>{t.to}</div>
                 <div style={{ marginTop: 4 }}>
-                  <span style={{ ...styles.rarityBadge, background: RARITY_COLOR[t.receive.rarity], fontSize: 9, marginRight: 6 }}>
+                  <span style={{ ...styles.rarityBadge, ...rarityStyle(t.receive.rarity), fontSize: 9, marginRight: 6 }}>
                     {t.receive.rarity}
                   </span>
                   {t.receive.name} ({t.receive.position})

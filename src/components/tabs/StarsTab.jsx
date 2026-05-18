@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { styles } from '../../theme/styles.js';
-import { COLORS, RARITY_COLOR } from '../../theme/colors.js';
+import { COLORS, RARITY_COLOR, rarityStyle } from '../../theme/colors.js';
 import { SectionTitle } from '../shared/SectionTitle.jsx';
 import { RARITY_MULT } from '../../engine/constants.js';
 
@@ -20,7 +20,7 @@ const PlayerRow = ({ player, onClick }) => {
     <div onClick={onClick}
          style={{ ...styles.playerRow, borderLeftColor: player.teamColor || COLORS.borderMute }}>
       <div style={{
-        ...styles.rarityBadge, background: RARITY_COLOR[player.rarity],
+        ...styles.rarityBadge, ...rarityStyle(player.rarity),
         minWidth: 64, textAlign: 'center',
       }}>{player.rarity}</div>
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -187,7 +187,7 @@ const LeaderboardView = ({ league, onSelectPlayer }) => {
                   color: rankColor, minWidth: 32,
                 }}>{i + 1}</div>
                 <div style={{
-                  ...styles.rarityBadge, background: RARITY_COLOR[p.rarity], fontSize: 9,
+                  ...styles.rarityBadge, ...rarityStyle(p.rarity), fontSize: 9,
                 }}>{p.rarity}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontFamily: "'Bebas Neue'", fontSize: 22, letterSpacing: 1, lineHeight: 1.1 }}>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { styles } from '../../theme/styles.js';
-import { COLORS, RARITY_COLOR, readableTextOn } from '../../theme/colors.js';
+import { COLORS, RARITY_COLOR, rarityStyle, readableTextOn } from '../../theme/colors.js';
 import { COACH_SPECIALTY_COLOR } from '../../data/specialties.js';
 import { Stat } from '../shared/Stat.jsx';
 import { describePlayerEffects } from '../../engine/bonuses.js';
@@ -88,7 +88,7 @@ export const PlayerDetail = ({ player, league, onBack }) => {
             {player.name.toUpperCase()}
           </div>
           <div style={{ marginTop: 12 }}>
-            <span style={{ ...styles.rarityBadge, background: RARITY_COLOR[player.rarity] }}>{player.rarity}</span>
+            <span style={{ ...styles.rarityBadge, ...rarityStyle(player.rarity) }}>{player.rarity}</span>
             <span style={{ marginLeft: 12, opacity: 0.85, fontSize: 13 }}>
               YEAR {player.yearsIn + 1} OF {player.career}
             </span>
