@@ -334,7 +334,7 @@ export default function App() {
     setRevealCount(0);
 
     for (let i = 1; i <= taggedResults.length; i++) {
-      await new Promise(res => setTimeout(res, 250));
+      await new Promise(res => setTimeout(res, 500));
       setRevealCount(i);
     }
 
@@ -354,10 +354,9 @@ export default function App() {
 
   const goToNextWeek = () => setWeekUiState('preview');
 
-  // ── PLAYOFF SIMULATION ──────────────────────────────────────────────────
-  const simulatePlayoffRound = async () => {
-    if (!playoffs) return;
-    const { seeds, round, results } = playoffs;
+  // ── PLAYOFF MATCHUP BUILDER ─────────────────────────────────────────────
+  // Returns the array of matches for the given round, given current seeds/results.
+  const buildPlayoffMatches = (round, seeds, results) => {
     const matches = [];
     if (round === 'wildcard') {
       ['AFC', 'NFC'].forEach(conf => {
@@ -385,13 +384,31 @@ export default function App() {
       const nfcChamp = results.conference.find(r => r.conf === 'NFC').winner;
       matches.push({ conf: 'SB', home: afcChamp, away: nfcChamp });
     }
+    return matches;
+  };
 
-    const roundResults = [];
-    setPlayoffSimState({
-      round, matches, current: 0, quarter: 0,
-      liveScores: matches.map(() => ({ h: 0, a: 0 })),
-    });
+  // ── PREPARE ROUND ──────────────────────────────────────────────────────
+  // Called when user clicks "Go to <round>" — fills in pending matches.
+  const prepareRound = () => {
+    if (!playoffs) return;
+    const { seeds, round, results, pendingMatches } = playoffs;
+    if (pendingMatches) return; // Already prepared.
+    if (round === 'done') return;
+    const matches = buildPlayoffMatches(round, seeds, results);
+    setPlayoffs({ ...playoffs, pendingMatches: matches, gameResults: [] });
+  };
 
+  // ── SIMULATE A SPECIFIC PLAYOFF GAME ───────────────────────────────────
+  // Runs the sim, animates quarter-by-quarter, records the result.
+  // gameIdx is the index in pendingMatches.
+  const simulatePlayoffGame = async (gameIdx) => {
+    if (!playoffs?.pendingMatches) return;
+    const m = playoffs.pendingMatches[gameIdx];
+    if (!m) return;
+    // If this game was already simulated, refuse.
+    if (playoffs.gameResults?.[gameIdx]) return;
+
+    // Deep clone the league so we can apply stat lines and player updates.
     const newLeague = league.map(t => ({
       ...t,
       roster: {
@@ -403,63 +420,78 @@ export default function App() {
       teamSeasonStats: { ...t.teamSeasonStats },
     }));
 
-    for (let gi = 0; gi < matches.length; gi++) {
-      const m = matches[gi];
-      const tH = newLeague.find(t => t.id === m.home.id);
-      const tA = newLeague.find(t => t.id === m.away.id);
-      const r = simulateGame(tH, tA);
-      if (r.homeScore === r.awayScore) {
-        if (Math.random() > 0.5) r.homeScore += 3; else r.awayScore += 3;
-      }
-      const applyStatLines = (team, lines) => {
-        lines.forEach(line => {
-          const allP = [team.roster.qb, team.roster.coach, ...team.roster.stars].filter(Boolean);
-          const player = allP.find(p => p.id === line.id);
-          if (player) player.currentSeason = addStats(player.currentSeason, line.statDelta);
-        });
-      };
-      applyStatLines(tH, r.playerStatsHome);
-      applyStatLines(tA, r.playerStatsAway);
-
-      for (let q = 1; q <= 4; q++) {
-        await new Promise(res => setTimeout(res, 600));
-        const liveH = Math.round((r.homeScore * q) / 4);
-        const liveA = Math.round((r.awayScore * q) / 4);
-        setPlayoffSimState(prev => {
-          if (!prev) return prev;
-          const ls = [...prev.liveScores];
-          ls[gi] = { h: liveH, a: liveA };
-          return { ...prev, current: gi, quarter: q, liveScores: ls };
-        });
-      }
-      const winner = r.homeScore > r.awayScore ? tH : tA;
-      const loser  = r.homeScore > r.awayScore ? tA : tH;
-      roundResults.push({
-        conf: m.conf, winner, loser,
-        result: { ...r, week: `P-${round}`, home: tH.id, away: tA.id },
-      });
+    const tH = newLeague.find(t => t.id === m.home.id);
+    const tA = newLeague.find(t => t.id === m.away.id);
+    const r = simulateGame(tH, tA);
+    if (r.homeScore === r.awayScore) {
+      if (Math.random() > 0.5) r.homeScore += 3; else r.awayScore += 3;
     }
+
+    const applyStatLines = (team, lines) => {
+      lines.forEach(line => {
+        const allP = [team.roster.qb, team.roster.coach, ...team.roster.stars].filter(Boolean);
+        const p = allP.find(x => x.id === line.id);
+        if (p) p.currentSeason = addStats(p.currentSeason, line.statDelta);
+      });
+    };
+    applyStatLines(tH, r.playerStatsHome);
+    applyStatLines(tA, r.playerStatsAway);
+
+    // Animate quarter-by-quarter at 500ms (was 600 in old all-at-once flow).
+    setPlayoffSimState({ gameIdx, quarter: 0, live: { h: 0, a: 0 } });
+    for (let q = 1; q <= 4; q++) {
+      await new Promise(res => setTimeout(res, 500));
+      const liveH = Math.round((r.homeScore * q) / 4);
+      const liveA = Math.round((r.awayScore * q) / 4);
+      setPlayoffSimState({ gameIdx, quarter: q, live: { h: liveH, a: liveA } });
+    }
+
+    const winner = r.homeScore > r.awayScore ? tH : tA;
+    const loser  = r.homeScore > r.awayScore ? tA : tH;
+    const gameResult = {
+      conf: m.conf, winner, loser,
+      result: { ...r, week: `P-${playoffs.round}`, home: tH.id, away: tA.id, gameIdx },
+    };
 
     setLeague(newLeague);
     setPlayoffSimState(null);
 
-    // Ingest playoff game stats into per-game leaderboards.
+    // Update per-game leaderboards
     let nextPlayerRecords = playerRecords;
-    roundResults.forEach((r, gi) => {
-      // The result object has home/away IDs and playerStatsHome/Away.
-      nextPlayerRecords = ingestGameRecords({
-        playerRecords: nextPlayerRecords,
-        game: r.result, league: newLeague,
-        season: seasonNum, week: r.result.week, // 'P-wildcard' etc.
-      });
+    nextPlayerRecords = ingestGameRecords({
+      playerRecords: nextPlayerRecords,
+      game: gameResult.result, league: newLeague,
+      season: seasonNum, week: gameResult.result.week,
     });
     setPlayerRecords(nextPlayerRecords);
 
+    // Store the result by index.
+    const newGameResults = [...(playoffs.gameResults || [])];
+    newGameResults[gameIdx] = gameResult;
+    setPlayoffs({ ...playoffs, gameResults: newGameResults });
+  };
+
+  // ── COMPLETE THE CURRENT ROUND AND ADVANCE ─────────────────────────────
+  // Called when all pendingMatches have results. Stores the round results,
+  // clears pendingMatches, advances to the next round.
+  const advancePlayoffRound = () => {
+    if (!playoffs?.pendingMatches) return;
+    const total = playoffs.pendingMatches.length;
+    const done = (playoffs.gameResults || []).filter(Boolean).length;
+    if (done < total) return; // Not all games played.
+    const round = playoffs.round;
     const nextRound = round === 'wildcard'   ? 'divisional'
                     : round === 'divisional' ? 'conference'
                     : round === 'conference' ? 'superbowl'
                     : 'done';
-    setPlayoffs({ seeds, round: nextRound, results: { ...results, [round]: roundResults } });
+    const completedRoundResults = playoffs.gameResults.filter(Boolean);
+    setPlayoffs({
+      seeds: playoffs.seeds,
+      round: nextRound,
+      results: { ...playoffs.results, [round]: completedRoundResults },
+      pendingMatches: null,
+      gameResults: [],
+    });
   };
 
   // ── START OFFSEASON ─────────────────────────────────────────────────────
@@ -509,8 +541,6 @@ export default function App() {
     }
     setHistory(prev => [...prev, historyEntry]);
 
-    setOffseasonStep('retire');
-
     const annotated = league.map(t => ({ ...t }));
     if (playoffs && playoffs.results) {
       const sbInner = playoffs.results.superbowl?.[0];
@@ -533,6 +563,29 @@ export default function App() {
     }
     setLeague(annotated);
 
+    // ── COMPUTE MOMENTUM CHANGES ────────────────────────────────────
+    // Pre-compute new legacy/current tiers based on this season's results.
+    // Show them on the momentum step; apply them at finalizeNextSeason.
+    const scoreOf = (t) => {
+      const res = t.playoffResult;
+      const base = { sb_winner: 100, sb_loser: 90, conf_finalist: 80,
+                     div_round_out: 70, wild_card_out: 60 }[res || ''] || 0;
+      return base + t.record.w * 2 + (t.record.pf - t.record.pa) / 10;
+    };
+    const ranking      = [...annotated].sort((a, b) => scoreOf(b) - scoreOf(a)).map(t => t.id);
+    const newLegacyMap = assignLegacy(ranking);
+    const newCurrentMap = rotateCurrent(annotated);
+    // Build a diff list for display: {teamId, fromLegacy, toLegacy, fromCurrent, toCurrent}
+    const momentumChanges = annotated.map(t => ({
+      teamId: t.id,
+      fromLegacy:  t.legacy,
+      toLegacy:    newLegacyMap[t.id],
+      fromCurrent: t.current,
+      toCurrent:   newCurrentMap[t.id],
+    }));
+
+    setOffseasonStep('momentum');
+
     const retirements = [];
     const lastYears   = [];
     annotated.forEach(t => {
@@ -542,7 +595,12 @@ export default function App() {
         else if (p.yearsIn + 1 === p.career - 1)  lastYears.push({ team: t.id, player: p });
       });
     });
-    setOffseasonData({ retirements, lastYears, historyEntry });
+    setOffseasonData({
+      retirements, lastYears, historyEntry,
+      momentumChanges,
+      precomputedLegacy: newLegacyMap,
+      precomputedCurrent: newCurrentMap,
+    });
   };
 
   // ── ARCHIVE SEASON & ROLL TO NEXT ───────────────────────────────────────
@@ -592,16 +650,21 @@ export default function App() {
     };
     const archived = newLeague.map(archiveTeam);
 
-    const scoreOf = (t) => {
-      const past = t.teamBySeason[t.teamBySeason.length - 1];
-      const res  = past?.playoffResult;
-      const base = { sb_winner: 100, sb_loser: 90, conf_finalist: 80, div_round_out: 70,
-                     wild_card_out: 60, div_winner: 65 }[res || ''] || 0;
-      return base + past.record.w * 2 + (past.record.pf - past.record.pa) / 10;
-    };
-    const ranking    = [...archived].sort((a, b) => scoreOf(b) - scoreOf(a)).map(t => t.id);
-    const newLegacy  = assignLegacy(ranking);
-    const newCurrent = rotateCurrent(archived);
+    // Use the legacy/current we pre-computed and displayed on the momentum
+    // step. If for some reason they weren't computed (older save format),
+    // fall back to recomputing here.
+    const newLegacy  = offseasonData?.precomputedLegacy
+      || assignLegacy([...archived].sort((a, b) => {
+        const score = t => {
+          const past = t.teamBySeason[t.teamBySeason.length - 1];
+          const res  = past?.playoffResult;
+          const base = { sb_winner: 100, sb_loser: 90, conf_finalist: 80,
+                         div_round_out: 70, wild_card_out: 60 }[res || ''] || 0;
+          return base + past.record.w * 2 + (past.record.pf - past.record.pa) / 10;
+        };
+        return score(b) - score(a);
+      }).map(t => t.id));
+    const newCurrent = offseasonData?.precomputedCurrent || rotateCurrent(archived);
 
     let nl = archived.map(t => ({
       ...t,
@@ -711,7 +774,10 @@ export default function App() {
                 weekHighlights={weekHighlights} schedule={schedule}
                 league={league} simulateWeek={simulateWeek}
                 hasPlayoffs={!!playoffs} playoffs={playoffs}
-                simRound={simulatePlayoffRound} simState={playoffSimState}
+                prepareRound={prepareRound}
+                simulatePlayoffGame={simulatePlayoffGame}
+                advancePlayoffRound={advancePlayoffRound}
+                simState={playoffSimState}
                 onStartOffseason={startOffseason}
                 weekUiState={weekUiState} revealCount={revealCount}
                 goToNextWeek={goToNextWeek}

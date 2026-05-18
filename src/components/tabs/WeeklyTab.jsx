@@ -184,7 +184,8 @@ const GameCard = ({ game, league, isLive, isRevealed, isPreview, onClick }) => {
 // ─── MAIN WEEKLY TAB ─────────────────────────────────────────────────────
 export const WeeklyTab = ({
   currentWeek, weekResults, weekHighlights, schedule, league, simulateWeek,
-  hasPlayoffs, playoffs, simRound, simState, onStartOffseason,
+  hasPlayoffs, playoffs, prepareRound, simulatePlayoffGame, advancePlayoffRound,
+  simState, onStartOffseason,
   weekUiState, revealCount, goToNextWeek, onSelectGame,
 }) => {
   // Completed weeks (sorted ascending).
@@ -204,8 +205,15 @@ export const WeeklyTab = ({
 
   if (hasPlayoffs) {
     return (
-      <PlayoffsView playoffs={playoffs} league={league} simRound={simRound} simState={simState}
-                    onStartOffseason={onStartOffseason} />
+      <PlayoffsView
+        playoffs={playoffs}
+        league={league}
+        simState={simState}
+        prepareRound={prepareRound}
+        simulatePlayoffGame={simulatePlayoffGame}
+        advancePlayoffRound={advancePlayoffRound}
+        onStartOffseason={onStartOffseason}
+      />
     );
   }
 

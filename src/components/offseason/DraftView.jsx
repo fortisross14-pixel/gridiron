@@ -125,7 +125,7 @@ export const DraftView = ({ data, setData, league, setLeague, freeAgents, setFre
 
   return (
     <div>
-      <SectionTitle title="OFFSEASON" subtitle="STEP 4 · DRAFT" />
+      <SectionTitle title="OFFSEASON" subtitle="STEP 5 · DRAFT" />
       {picks.length === 0 ? (
         <button onClick={runDraft} style={styles.bigBtn}>▶ RUN DRAFT</button>
       ) : (

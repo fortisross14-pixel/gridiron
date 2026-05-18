@@ -1,11 +1,68 @@
 import { styles } from '../../theme/styles.js';
-import { RARITY_COLOR, rarityStyle } from '../../theme/colors.js';
+import { COLORS, RARITY_COLOR, rarityStyle } from '../../theme/colors.js';
 import { SectionTitle } from '../shared/SectionTitle.jsx';
 import { DraftView } from './DraftView.jsx';
 import { makePlayer } from '../../engine/factory.js';
 import { rand, choice, generateRarity } from '../../engine/random.js';
 import { RARITY_DEDUCT } from '../../engine/constants.js';
-import { STAR_POSITIONS } from '../../data/teams.js';
+import { STAR_POSITIONS, TEAMS } from '../../data/teams.js';
+
+// ─── MOMENTUM CHANGE ROW ─────────────────────────────────────────────────
+const TIER_RANK = { Bottom: 0, Low: 1, Mid: 2, Candidate: 3, Dynasty: 4 };
+const LEGACY_RANK = { Normal: 0, Historical: 1, Classics: 2, 'Best Ever': 3 };
+
+const ChangeArrow = ({ direction }) => (
+  <span style={{
+    display: 'inline-block', minWidth: 20, textAlign: 'center', fontWeight: 800,
+    color: direction === 'up' ? COLORS.success
+         : direction === 'down' ? COLORS.danger
+         : COLORS.textMute,
+  }}>
+    {direction === 'up' ? '▲' : direction === 'down' ? '▼' : '—'}
+  </span>
+);
+
+const MomentumChangeRow = ({ change }) => {
+  const team = TEAMS.find(t => t.id === change.teamId);
+  const legDir = LEGACY_RANK[change.toLegacy.tier] > LEGACY_RANK[change.fromLegacy.tier] ? 'up'
+               : LEGACY_RANK[change.toLegacy.tier] < LEGACY_RANK[change.fromLegacy.tier] ? 'down'
+               : 'same';
+  const curDir = TIER_RANK[change.toCurrent.tier] > TIER_RANK[change.fromCurrent.tier] ? 'up'
+               : TIER_RANK[change.toCurrent.tier] < TIER_RANK[change.fromCurrent.tier] ? 'down'
+               : 'same';
+  // Skip teams with no change at all.
+  if (legDir === 'same' && curDir === 'same') return null;
+
+  return (
+    <div style={{
+      display: 'grid', gridTemplateColumns: '120px 1fr 1fr', gap: 12,
+      padding: '10px 12px',
+      background: COLORS.panelDeep, borderRadius: 6,
+      borderLeft: `4px solid ${team?.color || COLORS.borderMute}`,
+      fontSize: 13, alignItems: 'center',
+    }}>
+      <div style={{ fontWeight: 700 }}>
+        {team?.id} {team?.name}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+        <span style={{ color: COLORS.textMute, fontSize: 10, letterSpacing: 1 }}>LEGACY</span>
+        <span>{change.fromLegacy.tier} +{change.fromLegacy.value}</span>
+        <ChangeArrow direction={legDir} />
+        <span style={{ fontWeight: legDir !== 'same' ? 800 : 400 }}>
+          {change.toLegacy.tier} +{change.toLegacy.value}
+        </span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+        <span style={{ color: COLORS.textMute, fontSize: 10, letterSpacing: 1 }}>CURRENT</span>
+        <span>{change.fromCurrent.tier} +{change.fromCurrent.value}</span>
+        <ChangeArrow direction={curDir} />
+        <span style={{ fontWeight: curDir !== 'same' ? 800 : 400 }}>
+          {change.toCurrent.tier} +{change.toCurrent.value}
+        </span>
+      </div>
+    </div>
+  );
+};
 
 const RetireRow = ({ item, league }) => {
   const t = league.find(x => x.id === item.team);
@@ -26,10 +83,46 @@ export const OffseasonView = ({
   step, setStep, data, setData, league, setLeague,
   freeAgents, setFreeAgents, seasonNum, onComplete,
 }) => {
+  // ── MOMENTUM STEP ───────────────────────────────────────────────────
+  if (step === 'momentum') {
+    const changes = (data?.momentumChanges || []);
+    // Filter out unchanged teams; sort by biggest mover first.
+    const changed = changes.filter(c => {
+      const legDelta = LEGACY_RANK[c.toLegacy.tier]  - LEGACY_RANK[c.fromLegacy.tier];
+      const curDelta = TIER_RANK[c.toCurrent.tier] - TIER_RANK[c.fromCurrent.tier];
+      return legDelta !== 0 || curDelta !== 0;
+    });
+    return (
+      <div>
+        <SectionTitle title="OFFSEASON" subtitle="STEP 1 · MOMENTUM SHIFTS" />
+        <div style={styles.detailCard}>
+          <h4 style={styles.detailH4}>TEAM MOMENTUM CHANGES ({changed.length})</h4>
+          {changed.length === 0 ? (
+            <div style={{ opacity: 0.5, padding: 12 }}>No tier changes this offseason.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {changed.map(c => <MomentumChangeRow key={c.teamId} change={c} />)}
+            </div>
+          )}
+          <div style={{
+            marginTop: 12, padding: 10, background: COLORS.panelDeep, borderRadius: 6,
+            fontSize: 11, color: COLORS.textMute, lineHeight: 1.5,
+          }}>
+            Legacy reflects long-term accomplishments and shifts based on this season's playoff performance.
+            Current momentum reflects short-term form and can move up/down a tier as teams ascend or fade.
+          </div>
+        </div>
+        <button onClick={() => setStep('retire')} style={{ ...styles.bigBtn, marginTop: 16 }}>
+          → RETIREMENTS
+        </button>
+      </div>
+    );
+  }
+
   if (step === 'retire') {
     return (
       <div>
-        <SectionTitle title="OFFSEASON" subtitle="STEP 1 · RETIREMENTS" />
+        <SectionTitle title="OFFSEASON" subtitle="STEP 2 · RETIREMENTS" />
         <div style={styles.offGrid}>
           <div style={styles.detailCard}>
             <h4 style={styles.detailH4}>🏁 RETIRING ({data.retirements.length})</h4>
@@ -80,7 +173,7 @@ export const OffseasonView = ({
   if (step === 'fa') {
     return (
       <div>
-        <SectionTitle title="OFFSEASON" subtitle="STEP 2 · FREE AGENCY" />
+        <SectionTitle title="OFFSEASON" subtitle="STEP 3 · FREE AGENCY" />
         <div style={styles.detailCard}>
           <h4 style={styles.detailH4}>RELEASED ({data.releases.length})</h4>
           {data.releases.map((r, i) => {
@@ -134,7 +227,7 @@ export const OffseasonView = ({
   if (step === 'trades') {
     return (
       <div>
-        <SectionTitle title="OFFSEASON" subtitle="STEP 3 · TRADES" />
+        <SectionTitle title="OFFSEASON" subtitle="STEP 4 · TRADES" />
         <div style={styles.detailCard}>
           <h4 style={styles.detailH4}>BLOCKBUSTER TRADES ({data.trades.length})</h4>
           {data.trades.map((t, i) => (
