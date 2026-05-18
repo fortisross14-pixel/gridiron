@@ -2,9 +2,72 @@ import { useState } from 'react';
 import { styles } from '../../theme/styles.js';
 import { COLORS } from '../../theme/colors.js';
 import { SectionTitle } from '../shared/SectionTitle.jsx';
+import { clinchedTeams } from '../../engine/clinching.js';
 
-export const StandingsTab = ({ league, onSelectTeam }) => {
+// ─── CONFERENCE TITLE ROW ────────────────────────────────────────────────
+const ConfHeader = ({ label }) => (
+  <div style={{
+    gridColumn: '1 / -1',
+    fontFamily: "'Bebas Neue'", fontSize: 22, letterSpacing: 4,
+    color: COLORS.text, fontWeight: 700,
+    paddingTop: 8, paddingBottom: 4,
+    borderBottom: `2px solid ${COLORS.accent}`,
+    marginBottom: 4,
+  }}>{label}</div>
+);
+
+// ─── DIVISION CARD ───────────────────────────────────────────────────────
+const DivisionCard = ({ divLabel, teams, clinched, onSelectTeam }) => (
+  <div style={styles.detailCard}>
+    <h4 style={styles.detailH4}>{divLabel}</h4>
+    <table style={styles.standingsTable}>
+      <thead>
+        <tr>
+          <th style={styles.th}>Team</th>
+          <th style={styles.thNum}>W</th>
+          <th style={styles.thNum}>L</th>
+          <th style={styles.thNum}>PF</th>
+          <th style={styles.thNum}>PA</th>
+          <th style={styles.thNum}>DIFF</th>
+        </tr>
+      </thead>
+      <tbody>
+        {teams.map(t => {
+          const diff = t.record.pf - t.record.pa;
+          const isClinched = clinched.has(t.id);
+          return (
+            <tr key={t.id} onClick={() => onSelectTeam(t.id)} style={styles.standingRow}>
+              <td style={styles.td}>
+                <span style={{ ...styles.teamDot, background: t.color }} />
+                {t.city} {t.name}
+                {isClinched && (
+                  <span title="Clinched playoff berth" style={{
+                    marginLeft: 6, fontSize: 9, fontWeight: 800,
+                    color: COLORS.success, letterSpacing: 1,
+                  }}>x</span>
+                )}
+              </td>
+              <td style={styles.tdNum}>{t.record.w}</td>
+              <td style={styles.tdNum}>{t.record.l}</td>
+              <td style={styles.tdNum}>{t.record.pf}</td>
+              <td style={styles.tdNum}>{t.record.pa}</td>
+              <td style={{ ...styles.tdNum,
+                color: diff >= 0 ? COLORS.success : COLORS.danger,
+              }}>
+                {diff > 0 ? '+' : ''}{diff}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  </div>
+);
+
+// ─── MAIN STANDINGS TAB ──────────────────────────────────────────────────
+export const StandingsTab = ({ league, currentWeek, onSelectTeam }) => {
   const [subTab, setSubTab] = useState('division');
+  const clinched = clinchedTeams(league, currentWeek);
 
   // Group teams by "AFC East" etc.
   const byDiv = {};
@@ -37,45 +100,44 @@ export const StandingsTab = ({ league, onSelectTeam }) => {
       </div>
 
       {subTab === 'division' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 16 }}>
-          {Object.entries(byDiv).map(([div, teams]) => (
-            <div key={div} style={styles.detailCard}>
-              <h4 style={styles.detailH4}>{div}</h4>
-              <table style={styles.standingsTable}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>Team</th>
-                    <th style={styles.thNum}>W</th>
-                    <th style={styles.thNum}>L</th>
-                    <th style={styles.thNum}>PF</th>
-                    <th style={styles.thNum}>PA</th>
-                    <th style={styles.thNum}>DIFF</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {teams.map(t => (
-                    <tr key={t.id} onClick={() => onSelectTeam(t.id)} style={styles.standingRow}>
-                      <td style={styles.td}>
-                        <span style={{ ...styles.teamDot, background: t.color }} />
-                        {t.city} {t.name}
-                      </td>
-                      <td style={styles.tdNum}>{t.record.w}</td>
-                      <td style={styles.tdNum}>{t.record.l}</td>
-                      <td style={styles.tdNum}>{t.record.pf}</td>
-                      <td style={styles.tdNum}>{t.record.pa}</td>
-                      <td style={{
-                        ...styles.tdNum,
-                        color: t.record.pf - t.record.pa >= 0 ? COLORS.accent : COLORS.danger
-                      }}>
-                        {t.record.pf - t.record.pa > 0 ? '+' : ''}{t.record.pf - t.record.pa}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        <>
+          {/* AFC section */}
+          <ConfHeader label="AFC" />
+          <div style={{
+            display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
+            gap: 16, marginBottom: 24,
+          }}>
+            {['AFC East', 'AFC North', 'AFC South', 'AFC West'].map(div => (
+              byDiv[div] && (
+                <DivisionCard key={div} divLabel={div} teams={byDiv[div]}
+                              clinched={clinched} onSelectTeam={onSelectTeam} />
+              )
+            ))}
+          </div>
+
+          {/* NFC section */}
+          <ConfHeader label="NFC" />
+          <div style={{
+            display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
+            gap: 16,
+          }}>
+            {['NFC East', 'NFC North', 'NFC South', 'NFC West'].map(div => (
+              byDiv[div] && (
+                <DivisionCard key={div} divLabel={div} teams={byDiv[div]}
+                              clinched={clinched} onSelectTeam={onSelectTeam} />
+              )
+            ))}
+          </div>
+
+          {/* Clinched legend */}
+          {clinched.size > 0 && (
+            <div style={{
+              marginTop: 16, fontSize: 11, color: COLORS.textMute, letterSpacing: 1,
+            }}>
+              <span style={{ color: COLORS.success, fontWeight: 800 }}>x</span> — clinched playoff berth
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
 
       {subTab === 'conference' && (
@@ -100,30 +162,39 @@ export const StandingsTab = ({ league, onSelectTeam }) => {
                     </tr>
                   </thead>
                   <tbody>
-                    {confTeams.map((t, i) => (
-                      <tr key={t.id} onClick={() => onSelectTeam(t.id)} style={styles.standingRow}>
-                        <td style={styles.tdNum}>
-                          <span style={{
-                            color: i < 7 ? COLORS.accent : COLORS.textMute,
-                            fontWeight: 700,
-                          }}>{i + 1}</span>
-                        </td>
-                        <td style={styles.td}>
-                          <span style={{ ...styles.teamDot, background: t.color }} />
-                          {t.city} {t.name}
-                          {i === 0 && <span style={{ marginLeft: 6, fontSize: 9, color: '#FBBF24', letterSpacing: 1 }}>★</span>}
-                        </td>
-                        <td style={styles.tdNum}>{t.record.w}-{t.record.l}</td>
-                        <td style={styles.tdNum}>{t.record.pf}</td>
-                        <td style={styles.tdNum}>{t.record.pa}</td>
-                        <td style={{
-                          ...styles.tdNum,
-                          color: t.record.pf - t.record.pa >= 0 ? COLORS.accent : COLORS.danger
-                        }}>
-                          {t.record.pf - t.record.pa > 0 ? '+' : ''}{t.record.pf - t.record.pa}
-                        </td>
-                      </tr>
-                    ))}
+                    {confTeams.map((t, i) => {
+                      const diff = t.record.pf - t.record.pa;
+                      const isClinched = clinched.has(t.id);
+                      return (
+                        <tr key={t.id} onClick={() => onSelectTeam(t.id)} style={styles.standingRow}>
+                          <td style={styles.tdNum}>
+                            <span style={{
+                              color: i < 7 ? COLORS.accent : COLORS.textMute,
+                              fontWeight: 700,
+                            }}>{i + 1}</span>
+                          </td>
+                          <td style={styles.td}>
+                            <span style={{ ...styles.teamDot, background: t.color }} />
+                            {t.city} {t.name}
+                            {i === 0 && <span style={{ marginLeft: 6, fontSize: 9, color: COLORS.warning, letterSpacing: 1 }}>★</span>}
+                            {isClinched && (
+                              <span title="Clinched playoff berth" style={{
+                                marginLeft: 6, fontSize: 9, fontWeight: 800,
+                                color: COLORS.success, letterSpacing: 1,
+                              }}>x</span>
+                            )}
+                          </td>
+                          <td style={styles.tdNum}>{t.record.w}-{t.record.l}</td>
+                          <td style={styles.tdNum}>{t.record.pf}</td>
+                          <td style={styles.tdNum}>{t.record.pa}</td>
+                          <td style={{ ...styles.tdNum,
+                            color: diff >= 0 ? COLORS.success : COLORS.danger,
+                          }}>
+                            {diff > 0 ? '+' : ''}{diff}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

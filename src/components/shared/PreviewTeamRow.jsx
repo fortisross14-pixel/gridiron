@@ -1,14 +1,25 @@
-import { readableTextOn } from '../../theme/colors.js';
+import { readableTextOn, COLORS } from '../../theme/colors.js';
 
-// NFL-graphic-style team row: solid color tile (with team abbr) + name + score.
-export const PreviewTeamRow = ({ team, seed, score, isWinner, showSeed }) => {
+// NFL-graphic-style team row: solid color tile + name + record + score.
+//
+// Two display modes:
+//   - Preview (showSeed=true): shows pre-game seed and W-L
+//   - Result (recordAfter set): shows post-game W-L next to the team name
+export const PreviewTeamRow = ({ team, seed, score, isWinner, showSeed, recordAfter }) => {
   const tileColor = team.color;
   const tileText  = readableTextOn(tileColor);
+
+  // Format record string for display.
+  const fmtRec = (r) => `${r.w}-${r.l}${r.t > 0 ? `-${r.t}` : ''}`;
+  const recString = recordAfter ? fmtRec(recordAfter)
+    : showSeed ? fmtRec(team.record)
+    : null;
+
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 12,
       padding: '6px 0',
-      opacity: score != null && !isWinner ? 0.45 : 1,
+      opacity: score != null && !isWinner ? 0.5 : 1,
       transition: 'opacity 0.3s',
     }}>
       <div style={{
@@ -22,20 +33,25 @@ export const PreviewTeamRow = ({ team, seed, score, isWinner, showSeed }) => {
         flexShrink: 0,
       }}>{team.id}</div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontFamily: "'Bebas Neue'", fontSize: 18, letterSpacing: 1, lineHeight: 1.1 }}>
+        <div style={{
+          fontFamily: "'Bebas Neue'", fontSize: 18, letterSpacing: 1,
+          lineHeight: 1.1, color: COLORS.text,
+        }}>
           {team.name.toUpperCase()}
         </div>
-        {showSeed && (
-          <div style={{ fontSize: 10, opacity: 0.55, marginTop: 2, letterSpacing: 1 }}>
-            {team.conf} {seed} · {team.record.w}-{team.record.l}
-            {team.record.t > 0 ? `-${team.record.t}` : ''}
+        {recString && (
+          <div style={{
+            fontSize: 10, color: COLORS.textMute, marginTop: 2, letterSpacing: 1,
+            fontWeight: 600,
+          }}>
+            {showSeed && seed ? `${team.conf} ${seed} · ` : ''}{recString}
           </div>
         )}
       </div>
       {score != null && (
         <span style={{
           fontFamily: "'JetBrains Mono'", fontSize: 22, fontWeight: 800,
-          color: isWinner ? '#FBBF24' : undefined,
+          color: isWinner ? COLORS.warning : COLORS.text,
         }}>
           {isWinner && <span style={{ marginRight: 4, fontSize: 14 }}>▸</span>}
           {score}

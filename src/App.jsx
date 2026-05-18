@@ -7,6 +7,7 @@ import {
 } from './engine/factory.js';
 import { simulateGame } from './engine/simulate.js';
 import { generateSchedule, seedPlayoffs, findPlayerById, rotateCurrent } from './engine/season.js';
+import { computeWeekHighlights } from './engine/highlights.js';
 import { updateMorale } from './state/morale.js';
 import { addStats, emptyStatLine, emptyTeamSeasonStats } from './state/stats.js';
 import { rand } from './engine/random.js';
@@ -57,6 +58,14 @@ export default function App() {
   const [offseasonStep,    setOffseasonStep]    = useState(null);
   const [offseasonData,    setOffseasonData]    = useState(null);
 
+  // Records (per-season high marks, all-time high marks)
+  const [seasonRecords, setSeasonRecords] = useState({});
+  const [careerRecords, setCareerRecords] = useState({});
+  // Set of teamIds that have clinched a playoff berth this season (persisted)
+  const [clinched, setClinched] = useState([]);
+  // Highlights keyed by week number: { [weekNum]: [{ kind, text, week }, ...] }
+  const [weekHighlights, setWeekHighlights] = useState({});
+
   // Set to true while loading a slot — suppresses autosave during hydration.
   const hydrating = useRef(false);
 
@@ -85,6 +94,10 @@ export default function App() {
     setPlayoffSimState(null);
     setOffseasonStep(null);
     setOffseasonData(null);
+    setSeasonRecords({});
+    setCareerRecords({});
+    setClinched([]);
+    setWeekHighlights({});
     setActiveSlot(slotIdx);
     setSaveName(name);
     setMode('playing');
@@ -108,6 +121,10 @@ export default function App() {
     setPlayoffs(state.playoffs || null);
     setOffseasonStep(state.offseasonStep || null);
     setOffseasonData(state.offseasonData || null);
+    setSeasonRecords(state.seasonRecords || {});
+    setCareerRecords(state.careerRecords || {});
+    setClinched(state.clinched || []);
+    setWeekHighlights(state.weekHighlights || {});
     setSelectedTeamId(null);
     setSelectedPlayerId(null);
     setSelectedGame(null);
@@ -159,6 +176,7 @@ export default function App() {
       seasonNum, history,
       tab, weekUiState,
       playoffs, offseasonStep, offseasonData,
+      seasonRecords, careerRecords, clinched, weekHighlights,
     };
     writeSave(activeSlot, meta, state);
   }, [
@@ -168,6 +186,7 @@ export default function App() {
     seasonNum, history,
     tab, weekUiState,
     playoffs, offseasonStep, offseasonData,
+    seasonRecords, careerRecords, clinched, weekHighlights,
   ]);
 
   // ── HOME SCREEN ─────────────────────────────────────────────────────────
@@ -188,6 +207,9 @@ export default function App() {
     if (currentWeek > REGULAR_SEASON_WEEKS) return;
     const weekGames = schedule[currentWeek - 1];
     const results = [];
+
+    // Snapshot the league state BEFORE this week (for upset/seed analysis).
+    const preWeekLeague = league;
 
     const updatedLeague = league.map(t => ({
       ...t,
@@ -217,7 +239,6 @@ export default function App() {
       const tH = findT(home);
       const tA = findT(away);
       const r = simulateGame(tH, tA);
-      results.push(r);
       const isDiv = tH.div === tA.div && tH.conf === tA.conf;
       const homeWon = r.homeScore > r.awayScore;
       const tied    = r.homeScore === r.awayScore;
@@ -226,6 +247,10 @@ export default function App() {
       else              { tH.record.l += 1; tA.record.w += 1; }
       tH.record.pf += r.homeScore; tH.record.pa += r.awayScore;
       tA.record.pf += r.awayScore; tA.record.pa += r.homeScore;
+      // Snapshot W-L-T as of this game for the result-card display.
+      r.homeRecordAfter = { w: tH.record.w, l: tH.record.l, t: tH.record.t };
+      r.awayRecordAfter = { w: tA.record.w, l: tA.record.l, t: tA.record.t };
+      results.push(r);
 
       tH.teamSeasonStats = addStats(tH.teamSeasonStats, {
         gp: 1, w: homeWon ? 1 : 0, l: !homeWon && !tied ? 1 : 0, t: tied ? 1 : 0,
@@ -253,6 +278,32 @@ export default function App() {
     });
 
     const taggedResults = results.map((r, idx) => ({ ...r, week: currentWeek, gameIdx: idx }));
+
+    // ── HIGHLIGHTS ─────────────────────────────────────────────────────
+    const wasFinale = currentWeek === REGULAR_SEASON_WEEKS;
+    const prevClinchedSet = new Set(clinched);
+    let willMakePlayoffs;
+    if (wasFinale) {
+      const seeds = seedPlayoffs(updatedLeague);
+      willMakePlayoffs = new Set([...seeds.AFC, ...seeds.NFC].map(t => t.id));
+    }
+    const hl = computeWeekHighlights({
+      weekNumber: currentWeek,
+      weekResults: taggedResults,
+      preWeekLeague, postWeekLeague: updatedLeague,
+      prevClinched: prevClinchedSet,
+      seasonRecords, careerRecords,
+      seasonNum,
+      isRegularSeasonFinale: wasFinale,
+      willMakePlayoffs,
+    });
+    setSeasonRecords(hl.seasonRecords);
+    setCareerRecords(hl.careerRecords);
+    setWeekHighlights(prev => ({ ...prev, [currentWeek]: hl.highlights }));
+    // Merge newly clinched into our persistent set.
+    const merged = new Set([...prevClinchedSet, ...hl.clinched]);
+    setClinched([...merged]);
+
     setWeekResults(prev => ({ ...prev, [currentWeek]: taggedResults }));
     setLeague(updatedLeague);
     setWeekUiState('simulating');
@@ -539,6 +590,9 @@ export default function App() {
     setPlayoffs(null);
     setOffseasonStep(null);
     setOffseasonData(null);
+    setSeasonRecords({});  // career records persist; season records reset
+    setClinched([]);
+    setWeekHighlights({});
     setWeekUiState('idle');
     setRevealCount(0);
     setTab('weekly');
@@ -605,7 +659,8 @@ export default function App() {
           <>
             {tab === 'weekly' && (
               <WeeklyTab
-                currentWeek={currentWeek} weekResults={weekResults} schedule={schedule}
+                currentWeek={currentWeek} weekResults={weekResults}
+                weekHighlights={weekHighlights} schedule={schedule}
                 league={league} simulateWeek={simulateWeek}
                 hasPlayoffs={!!playoffs} playoffs={playoffs}
                 simRound={simulatePlayoffRound} simState={playoffSimState}
@@ -615,7 +670,7 @@ export default function App() {
                 onSelectGame={setSelectedGame}
               />
             )}
-            {tab === 'standings' && <StandingsTab league={league} onSelectTeam={setSelectedTeamId} />}
+            {tab === 'standings' && <StandingsTab league={league} currentWeek={currentWeek} onSelectTeam={setSelectedTeamId} />}
             {tab === 'stars'     && <StarsTab     league={league} freeAgents={freeAgents}
                                                   onSelectPlayer={setSelectedPlayerId} />}
             {tab === 'teams'     && <TeamsTab     league={league} onSelectTeam={setSelectedTeamId} />}
