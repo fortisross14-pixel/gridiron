@@ -4,6 +4,7 @@ import { COLORS, RARITY_COLOR } from '../../theme/colors.js';
 import { SectionTitle } from '../shared/SectionTitle.jsx';
 import { RARITY_MULT } from '../../engine/constants.js';
 
+// ─── PLAYER ROW (used in Roster view) ────────────────────────────────────
 const PlayerRow = ({ player, onClick }) => {
   const stats = player.currentSeason || {};
   const renderStats = () => {
@@ -34,7 +35,8 @@ const PlayerRow = ({ player, onClick }) => {
   );
 };
 
-export const StarsTab = ({ league, freeAgents, onSelectPlayer }) => {
+// ─── ROSTER VIEW ─────────────────────────────────────────────────────────
+const RosterView = ({ league, freeAgents, onSelectPlayer }) => {
   const [posFilter, setPosFilter] = useState('ALL');
   const [sortKey, setSortKey]     = useState('auto');
   const [showFA, setShowFA]       = useState(false);
@@ -77,9 +79,7 @@ export const StarsTab = ({ league, freeAgents, onSelectPlayer }) => {
   );
 
   return (
-    <div>
-      <SectionTitle title="STARS"
-                    subtitle={`${sorted.length} players · ${posFilter === 'ALL' ? 'all positions' : posFilter}`} />
+    <>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
         <span style={{ fontSize: 11, letterSpacing: 1.5, opacity: 0.6, alignSelf: 'center' }}>POSITION</span>
         {positions.map(p => chip(posFilter === p, () => { setPosFilter(p); setSortKey('auto'); }, p))}
@@ -104,6 +104,142 @@ export const StarsTab = ({ league, freeAgents, onSelectPlayer }) => {
         <div style={{ opacity: 0.5, fontSize: 12, marginTop: 12, textAlign: 'center' }}>
           Showing top 100 of {sorted.length}
         </div>
+      )}
+    </>
+  );
+};
+
+// ─── LEADERBOARD VIEW ─────────────────────────────────────────────────────
+// "Top Rushing Yards"-style display: pick a stat, see top 20 ranked.
+const LEADERBOARD_STATS = [
+  { key: 'passYds',  label: 'PASSING YDS',     positions: ['QB'],          fmt: v => `${v} yds` },
+  { key: 'passTd',   label: 'PASSING TDs',     positions: ['QB'],          fmt: v => `${v} TD` },
+  { key: 'rushYds',  label: 'RUSHING YDS',     positions: ['RB','QB'],     fmt: v => `${v} yds` },
+  { key: 'rushTd',   label: 'RUSHING TDs',     positions: ['RB','QB'],     fmt: v => `${v} TD` },
+  { key: 'recYds',   label: 'RECEIVING YDS',   positions: ['WR','TE','RB'],fmt: v => `${v} yds` },
+  { key: 'recTd',    label: 'RECEIVING TDs',   positions: ['WR','TE','RB'],fmt: v => `${v} TD` },
+  { key: 'rec',      label: 'RECEPTIONS',      positions: ['WR','TE','RB'],fmt: v => `${v} REC` },
+  { key: 'sacks',    label: 'SACKS',           positions: ['DE'],          fmt: v => `${v}` },
+  { key: 'ints',     label: 'INTERCEPTIONS',   positions: ['CB'],          fmt: v => `${v} INT` },
+  { key: 'tackles',  label: 'TACKLES',         positions: ['DE','CB'],     fmt: v => `${v}` },
+  { key: 'fgm',      label: 'FIELD GOALS',     positions: ['K/P'],         fmt: v => `${v} FG` },
+];
+
+const LeaderboardView = ({ league, onSelectPlayer }) => {
+  const [statKey, setStatKey] = useState('passYds');
+  const stat = LEADERBOARD_STATS.find(s => s.key === statKey);
+
+  const all = league.flatMap(t => {
+    const players = [t.roster.qb, ...t.roster.stars].filter(Boolean);
+    return players.map(p => ({ ...p, teamId: t.id, teamColor: t.color, teamCity: t.city, teamName: t.name }));
+  });
+  const eligible = all.filter(p => stat.positions.includes(p.position));
+  const sorted = [...eligible]
+    .sort((a, b) => (b.currentSeason?.[statKey] || 0) - (a.currentSeason?.[statKey] || 0))
+    .slice(0, 20);
+  const max = Math.max(1, ...sorted.map(p => p.currentSeason?.[statKey] || 0));
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+        <span style={{ fontSize: 11, letterSpacing: 1.5, opacity: 0.6, alignSelf: 'center', marginRight: 4 }}>STAT</span>
+        {LEADERBOARD_STATS.map(s => (
+          <button key={s.key} onClick={() => setStatKey(s.key)} style={{
+            ...styles.chip,
+            background: statKey === s.key ? COLORS.accent : 'transparent',
+            color:      statKey === s.key ? COLORS.accentText : COLORS.textMute,
+          }}>{s.label}</button>
+        ))}
+      </div>
+
+      <div style={{
+        fontFamily: "'Bebas Neue'", fontSize: 28, letterSpacing: 3,
+        color: COLORS.text, marginBottom: 16,
+      }}>
+        TOP {stat.label}
+      </div>
+
+      <div style={{ display: 'grid', gap: 6 }}>
+        {sorted.map((p, i) => {
+          const v = p.currentSeason?.[statKey] || 0;
+          const pct = Math.max(0.04, v / max);
+          const rankColor = i === 0 ? '#FBBF24' : i === 1 ? '#A5ACAF' : i === 2 ? '#B87333' : COLORS.textMute;
+          return (
+            <div key={p.id} onClick={() => onSelectPlayer(p.id)} style={{
+              position: 'relative',
+              background: COLORS.panel,
+              border: `1px solid ${COLORS.border}`,
+              borderLeft: `4px solid ${p.teamColor}`,
+              borderRadius: 8,
+              padding: '12px 16px',
+              cursor: 'pointer',
+              overflow: 'hidden',
+            }}>
+              <div style={{
+                position: 'absolute', top: 0, left: 0, bottom: 0,
+                width: `${pct * 100}%`,
+                background: `linear-gradient(90deg, ${p.teamColor}44 0%, ${p.teamColor}11 100%)`,
+                pointerEvents: 'none',
+              }} />
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div style={{
+                  fontFamily: "'JetBrains Mono'", fontSize: 22, fontWeight: 900,
+                  color: rankColor, minWidth: 32,
+                }}>{i + 1}</div>
+                <div style={{
+                  ...styles.rarityBadge, background: RARITY_COLOR[p.rarity], fontSize: 9,
+                }}>{p.rarity}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontFamily: "'Bebas Neue'", fontSize: 22, letterSpacing: 1, lineHeight: 1.1 }}>
+                    {p.name.toUpperCase()}
+                  </div>
+                  <div style={{ fontSize: 10, letterSpacing: 1.5, opacity: 0.55 }}>
+                    {p.position} · {p.teamId}
+                  </div>
+                </div>
+                <div style={{
+                  fontFamily: "'JetBrains Mono'", fontSize: 26, fontWeight: 800, color: COLORS.text,
+                }}>{v}</div>
+              </div>
+            </div>
+          );
+        })}
+        {sorted.length === 0 && (
+          <div style={{ opacity: 0.5, padding: 20, textAlign: 'center' }}>
+            No data yet — play some weeks to populate the leaderboard.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ─── MAIN STARS TAB ───────────────────────────────────────────────────────
+export const StarsTab = ({ league, freeAgents, onSelectPlayer }) => {
+  const [view, setView] = useState('roster');
+
+  const viewBtn = (key, label) => (
+    <button onClick={() => setView(key)} style={{
+      ...styles.chip, padding: '8px 16px', fontSize: 12,
+      background: view === key ? COLORS.accent : 'transparent',
+      color:      view === key ? COLORS.accentText : COLORS.textMute,
+    }}>{label}</button>
+  );
+
+  return (
+    <div>
+      <SectionTitle title="STARS"
+        subtitle={view === 'roster' ? 'Filter · Sort · Browse' : 'Top Performers'} />
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+        {viewBtn('roster',     'ROSTER')}
+        {viewBtn('leaderboard','LEADERBOARD')}
+      </div>
+
+      {view === 'roster' ? (
+        <RosterView league={league} freeAgents={freeAgents} onSelectPlayer={onSelectPlayer} />
+      ) : (
+        <LeaderboardView league={league} onSelectPlayer={onSelectPlayer} />
       )}
     </div>
   );

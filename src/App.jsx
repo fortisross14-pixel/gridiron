@@ -60,11 +60,13 @@ export default function App() {
   const hydrating = useRef(false);
 
   // ── CREATE NEW LEAGUE ───────────────────────────────────────────────────
+  // Season 1 starts with FLAT legacy (everyone "Normal" +1). Legacy gets
+  // earned in subsequent seasons via assignLegacy() based on real results.
   const startNewLeague = (slotIdx, name) => {
-    const ranked  = [...TEAMS].sort((a, b) => historyScore(b.id) - historyScore(a.id)).map(t => t.id);
-    const legacy  = assignLegacy(ranked);
+    const flatLegacy = {};
+    TEAMS.forEach(t => { flatLegacy[t.id] = { tier: 'Normal', value: 1 }; });
     const current = assignRandomCurrent();
-    const teams   = TEAMS.map(t => createInitialTeam(t, legacy, current)).map(applyMomentumBoost);
+    const teams   = TEAMS.map(t => createInitialTeam(t, flatLegacy, current)).map(applyMomentumBoost);
     setLeague(teams);
     setSchedule(generateSchedule(teams));
     setFreeAgents(initialFreeAgents());

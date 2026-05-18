@@ -134,19 +134,12 @@ export const WeeklyTab = ({
                 const h = findT(g.home);
                 const a = findT(g.away);
                 const hWon = g.homeScore > g.awayScore;
+                const aWon = g.awayScore > g.homeScore;
                 return (
                   <div key={i} onClick={() => onSelectGame({ week: wk, gameIdx: i })}
                        style={{ ...styles.gameCard, cursor: 'pointer' }}>
-                    <div style={{ ...styles.gameTeamRow, opacity: hWon ? 1 : 0.55 }}>
-                      <span style={{ ...styles.gameTeamDot, background: h.color }} />
-                      <span style={styles.gameTeamLabel}>{h.id} {h.name}</span>
-                      <span style={styles.gameScore}>{g.homeScore}</span>
-                    </div>
-                    <div style={{ ...styles.gameTeamRow, opacity: !hWon ? 1 : 0.55 }}>
-                      <span style={{ ...styles.gameTeamDot, background: a.color }} />
-                      <span style={styles.gameTeamLabel}>{a.id} {a.name}</span>
-                      <span style={styles.gameScore}>{g.awayScore}</span>
-                    </div>
+                    <PreviewTeamRow team={h} score={g.homeScore} isWinner={hWon} />
+                    <PreviewTeamRow team={a} score={g.awayScore} isWinner={aWon} />
                     <div style={styles.gameMvp}>
                       <span style={{ opacity: 0.5 }}>MVP</span> {g.mvp}
                     </div>

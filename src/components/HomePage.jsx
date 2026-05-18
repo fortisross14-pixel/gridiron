@@ -31,20 +31,31 @@ export const HomePage = ({ onLoad, onNew }) => {
   return (
     <div style={styles.app}>
       <style>{`* { box-sizing: border-box; } body { margin: 0; }`}</style>
-      <div style={{ maxWidth: 900, margin: '0 auto', padding: '60px 28px' }}>
+      <div style={{ maxWidth: 900, margin: '0 auto', padding: '80px 28px 40px' }}>
         {/* HERO */}
-        <div style={{ textAlign: 'center', marginBottom: 48 }}>
+        <div style={{ textAlign: 'center', marginBottom: 56 }}>
           <div style={{
-            color: COLORS.accent, fontSize: 36, marginBottom: 8,
-          }}>●</div>
+            display: 'inline-flex', alignItems: 'center', gap: 12,
+            padding: '6px 14px', borderRadius: 20,
+            background: 'rgba(34,197,94,0.1)',
+            border: `1px solid rgba(34,197,94,0.3)`,
+            marginBottom: 24,
+            fontSize: 11, letterSpacing: 2, color: COLORS.accent,
+          }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: COLORS.accent }} />
+            NFL SEASON SIMULATOR
+          </div>
           <div style={{
-            fontFamily: "'Bebas Neue'", fontSize: 64, letterSpacing: 6,
-            lineHeight: 1, color: COLORS.text,
+            fontFamily: "'Bebas Neue'", fontSize: 88, letterSpacing: 8,
+            lineHeight: 0.95, color: COLORS.text,
+            textShadow: '0 4px 24px rgba(0,0,0,0.4)',
           }}>
             GRIDIRON
           </div>
-          <div style={{ fontSize: 14, letterSpacing: 5, opacity: 0.5, marginTop: 8 }}>
-            SEASON SIMULATOR
+          <div style={{
+            fontSize: 13, letterSpacing: 4, opacity: 0.5, marginTop: 12,
+          }}>
+            PICK A LEAGUE TO CONTINUE OR START A NEW ONE
           </div>
         </div>
 

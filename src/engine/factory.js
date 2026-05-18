@@ -104,6 +104,12 @@ export const createInitialTeam = (base, legacy, current) => {
 
 // Distribute leftover momentum points (×6) across the 7 mutable team stats.
 // momentumRemaining is stored on the team so the UI can show it.
+// Distribute leftover momentum points across the 7 mutable team stats, and
+// add a morale floor proportional to total momentum. High-momentum teams
+// thus enter games with more skill AND higher baseline morale.
+//
+// Conversion: each leftover momentum unit = 9 skill points spread across
+// 7 fields, plus +1 morale (capped at 99).
 export const applyMomentumBoost = (team) => {
   const totalMomentum = team.legacy.value * 2 + team.current.value;
   const used = RARITY_DEDUCT[team.roster.qb.rarity]
@@ -112,13 +118,17 @@ export const applyMomentumBoost = (team) => {
   const remaining = totalMomentum - used;
   const t = { ...team, stats: { ...team.stats } };
   t.momentumRemaining = remaining;
-  let pool = remaining * 6;
+
+  // Skill point pool: each leftover momentum = 11 points.
+  let pool = remaining * 11;
   const fields = ['passAtk','runAtk','passDef','runDef','stAtk','stDef','physical'];
   while (pool !== 0) {
     const f = choice(fields);
     if (pool > 0) { t.stats[f] += 1; pool -= 1; }
     else          { t.stats[f] -= 1; pool += 1; }
   }
+  // Morale floor: scale to total momentum (Dynasty + Best Ever = 20 → +20 morale).
+  t.stats.morale = Math.min(99, t.stats.morale + Math.max(0, totalMomentum - 5));
   return t;
 };
 

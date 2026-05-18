@@ -69,28 +69,34 @@ export const PlayerDetail = ({ player, league, onBack }) => {
 
       {/* HEADER — uses team primary/secondary gradient */}
       <div style={{
-        padding: 28, borderRadius: 6, marginBottom: 24,
+        position: 'relative',
+        padding: '32px 36px', borderRadius: 12, marginBottom: 20,
         color: headerTextColor,
         background: `linear-gradient(135deg, ${teamColors.primary}, ${teamColors.secondary})`,
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        overflow: 'hidden',
+        boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
       }}>
         <div>
-          <div style={{ fontSize: 12, letterSpacing: 3, opacity: 0.8 }}>
-            {player.kind === 'Coach' ? 'HEAD COACH' : player.position} · {team ? `${team.city} ${team.name}` : 'FREE AGENT'}
+          <div style={{ fontSize: 12, letterSpacing: 3, opacity: 0.85, fontWeight: 600 }}>
+            {player.kind === 'Coach' ? 'HEAD COACH' : player.position} · {team ? `${team.city.toUpperCase()} ${team.name.toUpperCase()}` : 'FREE AGENT'}
           </div>
-          <div style={{ fontFamily: "'Bebas Neue'", fontSize: 48, letterSpacing: 1, marginTop: 4 }}>
+          <div style={{
+            fontFamily: "'Bebas Neue'", fontSize: 56, letterSpacing: 1, marginTop: 6,
+            lineHeight: 0.95,
+          }}>
             {player.name.toUpperCase()}
           </div>
-          <div style={{ marginTop: 8 }}>
+          <div style={{ marginTop: 12 }}>
             <span style={{ ...styles.rarityBadge, background: RARITY_COLOR[player.rarity] }}>{player.rarity}</span>
             <span style={{ marginLeft: 12, opacity: 0.85, fontSize: 13 }}>
-              Year {player.yearsIn + 1} of {player.career}
+              YEAR {player.yearsIn + 1} OF {player.career}
             </span>
             {player.kind === 'Coach' && player.specialty && (
               <span style={{
-                marginLeft: 12, padding: '4px 10px', borderRadius: 4,
+                marginLeft: 12, padding: '5px 12px', borderRadius: 12,
                 background: COACH_SPECIALTY_COLOR[player.specialty] || '#9CA3AF',
-                fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase',
+                fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase',
                 color: '#0a0e1a',
               }}>
                 {player.specialty}

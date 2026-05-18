@@ -131,36 +131,45 @@ export const TeamDetail = ({ team, onBack, onPlayerClick, weekResults, onSelectG
       {/* HEADER: primary→secondary gradient with tertiary accent stripe */}
       <div style={{
         position: 'relative',
-        padding: 32, borderRadius: 6, marginBottom: 16,
+        padding: '40px 36px', borderRadius: 12, marginBottom: 16,
         color: headerTextColor,
         background: `linear-gradient(135deg, ${c.primary} 0%, ${c.secondary} 100%)`,
         overflow: 'hidden',
+        boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
       }}>
         {/* Tertiary accent stripe across the top edge */}
         <div style={{
-          position: 'absolute', top: 0, left: 0, right: 0, height: 4,
+          position: 'absolute', top: 0, left: 0, right: 0, height: 5,
           background: c.tertiary,
         }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <div style={{ fontSize: 13, letterSpacing: 3, opacity: 0.8 }}>{team.city.toUpperCase()}</div>
+            <div style={{ fontSize: 13, letterSpacing: 4, opacity: 0.85, fontWeight: 600 }}>
+              {team.city.toUpperCase()}
+            </div>
             <div style={{
-              fontSize: 56, fontWeight: 900, lineHeight: 1, letterSpacing: -2,
-              fontFamily: "'Bebas Neue'",
+              fontSize: 72, fontWeight: 900, lineHeight: 0.95, letterSpacing: -1,
+              fontFamily: "'Bebas Neue'", marginTop: 4,
+              textShadow: `0 2px 8px ${c.secondary}66`,
             }}>
               {team.name.toUpperCase()}
             </div>
-            <div style={{ marginTop: 8, fontSize: 14, opacity: 0.85 }}>
-              {team.div} Division · {team.conf}
+            <div style={{
+              marginTop: 12, fontSize: 13, opacity: 0.85, letterSpacing: 2,
+            }}>
+              {team.div.toUpperCase()} · {team.conf}
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
             <div style={{
-              fontSize: 64, fontWeight: 900, lineHeight: 1, fontFamily: "'Bebas Neue'",
+              fontSize: 72, fontWeight: 900, lineHeight: 0.95, fontFamily: "'Bebas Neue'",
+              letterSpacing: -1,
             }}>
               {team.record.w}-{team.record.l}{team.record.t > 0 ? `-${team.record.t}` : ''}
             </div>
-            <div style={{ fontSize: 13, opacity: 0.85, marginTop: 4 }}>RECORD</div>
+            <div style={{ fontSize: 12, opacity: 0.85, marginTop: 6, letterSpacing: 3 }}>
+              RECORD
+            </div>
           </div>
         </div>
       </div>

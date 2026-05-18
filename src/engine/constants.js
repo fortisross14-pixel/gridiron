@@ -79,14 +79,14 @@ export const PASS_BASE_PER_MIN = 5.5;
 export const RUSH_BASE_PER_MIN = 2.8;
 export const ST_BASE_PER_MIN   = 1.6;
 
-// Yard noise per game and possession noise per team. Higher = more variance
-// in close matchups.
-export const YARD_NOISE = 70;
-export const POSS_NOISE = 5;
+// Yard noise per game and possession noise per team. Lower = less variance,
+// so talent shows through more clearly.
+export const YARD_NOISE = 45;
+export const POSS_NOISE = 3;
 
-// Matchup multiplier sensitivity — higher value = less sensitive to rating
-// gaps (yards swing less from talent diff).
-export const MATCHUP_SENSITIVITY = 280;
+// Matchup multiplier sensitivity — lower = more sensitive to rating gaps.
+// At 140, a 60-point rating gap creates a ~43% yardage advantage.
+export const MATCHUP_SENSITIVITY = 140;
 
 // Scoring thresholds: yards required for each TD / FG attempt.
 export const PASS_TD_THRESHOLD = 95;
