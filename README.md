@@ -1,6 +1,6 @@
 # NFL Season Simulator
 
-Live URL: https://fortisross14-pixel.github.io/nfl-sim/
+Live URL: https://fortisross14-pixel.github.io/gridiron/
 
 ## Run locally
 
