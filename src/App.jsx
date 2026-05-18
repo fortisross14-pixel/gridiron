@@ -8,6 +8,10 @@ import {
 import { simulateGame } from './engine/simulate.js';
 import { generateSchedule, seedPlayoffs, findPlayerById, rotateCurrent } from './engine/season.js';
 import { computeWeekHighlights } from './engine/highlights.js';
+import {
+  emptyPlayerRecords, emptyTeamRecords,
+  ingestGameRecords, ingestSeasonRecords, ingestTeamRecords,
+} from './engine/leaderboards.js';
 import { updateMorale } from './state/morale.js';
 import { addStats, emptyStatLine, emptyTeamSeasonStats } from './state/stats.js';
 import { rand } from './engine/random.js';
@@ -65,6 +69,9 @@ export default function App() {
   const [clinched, setClinched] = useState([]);
   // Highlights keyed by week number: { [weekNum]: [{ kind, text, week }, ...] }
   const [weekHighlights, setWeekHighlights] = useState({});
+  // Long-form top-5 leaderboards for players (per-game/season/career) and teams.
+  const [playerRecords, setPlayerRecords] = useState({});
+  const [teamRecords,   setTeamRecords]   = useState({});
 
   // Set to true while loading a slot — suppresses autosave during hydration.
   const hydrating = useRef(false);
@@ -98,6 +105,8 @@ export default function App() {
     setCareerRecords({});
     setClinched([]);
     setWeekHighlights({});
+    setPlayerRecords(emptyPlayerRecords());
+    setTeamRecords(emptyTeamRecords(TEAMS.map(t => t.id)));
     setActiveSlot(slotIdx);
     setSaveName(name);
     setMode('playing');
@@ -125,6 +134,8 @@ export default function App() {
     setCareerRecords(state.careerRecords || {});
     setClinched(state.clinched || []);
     setWeekHighlights(state.weekHighlights || {});
+    setPlayerRecords(state.playerRecords || emptyPlayerRecords());
+    setTeamRecords(state.teamRecords || emptyTeamRecords(TEAMS.map(t => t.id)));
     setSelectedTeamId(null);
     setSelectedPlayerId(null);
     setSelectedGame(null);
@@ -177,6 +188,7 @@ export default function App() {
       tab, weekUiState,
       playoffs, offseasonStep, offseasonData,
       seasonRecords, careerRecords, clinched, weekHighlights,
+      playerRecords, teamRecords,
     };
     writeSave(activeSlot, meta, state);
   }, [
@@ -187,6 +199,7 @@ export default function App() {
     tab, weekUiState,
     playoffs, offseasonStep, offseasonData,
     seasonRecords, careerRecords, clinched, weekHighlights,
+    playerRecords, teamRecords,
   ]);
 
   // ── HOME SCREEN ─────────────────────────────────────────────────────────
@@ -304,6 +317,17 @@ export default function App() {
     const merged = new Set([...prevClinchedSet, ...hl.clinched]);
     setClinched([...merged]);
 
+    // Update per-game player leaderboards using each game's stat lines.
+    let nextPlayerRecords = playerRecords;
+    taggedResults.forEach(g => {
+      nextPlayerRecords = ingestGameRecords({
+        playerRecords: nextPlayerRecords,
+        game: g, league: updatedLeague,
+        season: seasonNum, week: currentWeek,
+      });
+    });
+    setPlayerRecords(nextPlayerRecords);
+
     setWeekResults(prev => ({ ...prev, [currentWeek]: taggedResults }));
     setLeague(updatedLeague);
     setWeekUiState('simulating');
@@ -418,6 +442,19 @@ export default function App() {
 
     setLeague(newLeague);
     setPlayoffSimState(null);
+
+    // Ingest playoff game stats into per-game leaderboards.
+    let nextPlayerRecords = playerRecords;
+    roundResults.forEach((r, gi) => {
+      // The result object has home/away IDs and playerStatsHome/Away.
+      nextPlayerRecords = ingestGameRecords({
+        playerRecords: nextPlayerRecords,
+        game: r.result, league: newLeague,
+        season: seasonNum, week: r.result.week, // 'P-wildcard' etc.
+      });
+    });
+    setPlayerRecords(nextPlayerRecords);
+
     const nextRound = round === 'wildcard'   ? 'divisional'
                     : round === 'divisional' ? 'conference'
                     : round === 'conference' ? 'superbowl'
@@ -510,6 +547,17 @@ export default function App() {
 
   // ── ARCHIVE SEASON & ROLL TO NEXT ───────────────────────────────────────
   const finalizeNextSeason = (newLeague, draftPick1) => {
+    // Ingest end-of-season records BEFORE archive resets currentSeason.
+    const updatedPlayerRecords = ingestSeasonRecords({
+      playerRecords, league: newLeague, season: seasonNum,
+    });
+    setPlayerRecords(updatedPlayerRecords);
+    // Team trophies/totals: division wins, conf wins, SB wins, playoff appearances.
+    const updatedTeamRecords = ingestTeamRecords({
+      teamRecords, league: newLeague, playoffs, season: seasonNum,
+    });
+    setTeamRecords(updatedTeamRecords);
+
     const archivePlayer = (p) => {
       if (!p) return p;
       const seasonRecord = { seasonNum, teamId: p.teamId, stats: { ...p.currentSeason } };
@@ -674,7 +722,10 @@ export default function App() {
             {tab === 'stars'     && <StarsTab     league={league} freeAgents={freeAgents}
                                                   onSelectPlayer={setSelectedPlayerId} />}
             {tab === 'teams'     && <TeamsTab     league={league} onSelectTeam={setSelectedTeamId} />}
-            {tab === 'history'   && <HistoryTab   history={history} />}
+            {tab === 'history'   && <HistoryTab history={history}
+                                                  playerRecords={playerRecords}
+                                                  teamRecords={teamRecords}
+                                                  onSelectTeam={setSelectedTeamId} />}
           </>
         )}
       </div>
