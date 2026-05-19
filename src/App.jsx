@@ -545,13 +545,21 @@ export default function App() {
       afcChamp: null,
       nfcChamp: null,
       offMvp: offMvp ? { id: offMvp.id, name: offMvp.name, position: offMvp.position,
-                          teamId: offMvp.teamId, stats: { ...offMvp.currentSeason } } : null,
+                          teamId: offMvp.teamId, rarity: offMvp.rarity,
+                          yearsIn: offMvp.yearsIn, career: offMvp.career,
+                          stats: { ...offMvp.currentSeason } } : null,
       defMvp: defMvp ? { id: defMvp.id, name: defMvp.name, position: defMvp.position,
-                          teamId: defMvp.teamId, stats: { ...defMvp.currentSeason } } : null,
+                          teamId: defMvp.teamId, rarity: defMvp.rarity,
+                          yearsIn: defMvp.yearsIn, career: defMvp.career,
+                          stats: { ...defMvp.currentSeason } } : null,
       offRookie: offRookie ? { id: offRookie.id, name: offRookie.name, position: offRookie.position,
-                                teamId: offRookie.teamId, stats: { ...offRookie.currentSeason } } : null,
+                                teamId: offRookie.teamId, rarity: offRookie.rarity,
+                                yearsIn: offRookie.yearsIn, career: offRookie.career,
+                                stats: { ...offRookie.currentSeason } } : null,
       defRookie: defRookie ? { id: defRookie.id, name: defRookie.name, position: defRookie.position,
-                                teamId: defRookie.teamId, stats: { ...defRookie.currentSeason } } : null,
+                                teamId: defRookie.teamId, rarity: defRookie.rarity,
+                                yearsIn: defRookie.yearsIn, career: defRookie.career,
+                                stats: { ...defRookie.currentSeason } } : null,
       draftPick1: null,
     };
     if (sb) {
@@ -559,6 +567,22 @@ export default function App() {
       const nfc = sb.winner.conf === 'NFC' ? sb.winner : sb.loser;
       historyEntry.afcChamp = { id: afc.id, name: afc.name, city: afc.city, color: afc.color };
       historyEntry.nfcChamp = { id: nfc.id, name: nfc.name, city: nfc.city, color: nfc.color };
+
+      // Snapshot the winning team's overall + record at this moment for the
+      // awards card (the league will mutate during offseason).
+      const wt = league.find(t => t.id === sb.winner.id);
+      if (wt) {
+        const s = wt.stats;
+        const overall = Math.round((s.passAtk + s.runAtk + s.passDef + s.runDef
+                                  + s.stAtk + s.stDef + s.physical) / 7);
+        historyEntry.sbWinnerSnapshot = {
+          record: { ...wt.record },
+          overall,
+          momentum: wt.legacy.value * 2 + wt.current.value,
+          legacy: { ...wt.legacy },
+          current: { ...wt.current },
+        };
+      }
     }
     setHistory(prev => [...prev, historyEntry]);
 
@@ -605,7 +629,25 @@ export default function App() {
       toCurrent:   newCurrentMap[t.id],
     }));
 
-    setOffseasonStep('momentum');
+    setOffseasonStep('awards');
+
+    // Build the Super Bowl MVP detail (look up the actual player on the
+    // winning team's roster). The Super Bowl game result already has mvpId.
+    let sbMvp = null;
+    if (sb && sb.winner) {
+      const sbResult = playoffs.results.superbowl[0].result;
+      const winnerTeam = league.find(t => t.id === sb.winner.id);
+      const allP = winnerTeam ? [winnerTeam.roster.qb, ...winnerTeam.roster.stars].filter(Boolean) : [];
+      const mvpPlayer = sbResult.mvpId ? allP.find(p => p.id === sbResult.mvpId) : null;
+      if (mvpPlayer) {
+        sbMvp = {
+          id: mvpPlayer.id, name: mvpPlayer.name,
+          position: mvpPlayer.position, rarity: mvpPlayer.rarity,
+          teamId: winnerTeam.id, yearsIn: mvpPlayer.yearsIn, career: mvpPlayer.career,
+          stats: { ...mvpPlayer.currentSeason },
+        };
+      }
+    }
 
     const retirements = [];
     const lastYears   = [];
@@ -621,6 +663,7 @@ export default function App() {
       momentumChanges,
       precomputedLegacy: newLegacyMap,
       precomputedCurrent: newCurrentMap,
+      sbMvp,
     });
   };
 

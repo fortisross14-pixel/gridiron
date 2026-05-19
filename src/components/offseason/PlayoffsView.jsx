@@ -355,7 +355,7 @@ export const PlayoffsView = ({
 
       {/* DONE — show offseason CTA */}
       {round === 'done' && (
-        <button onClick={onStartOffseason} style={styles.bigBtn}>→ BEGIN OFFSEASON</button>
+        <button onClick={onStartOffseason} style={styles.bigBtn}>🏆 AWARDS CEREMONY</button>
       )}
 
       {/* NOT YET STARTED — show "go to round" */}

@@ -1,11 +1,218 @@
+import { useState, useEffect } from 'react';
 import { styles } from '../../theme/styles.js';
-import { COLORS, RARITY_COLOR, rarityStyle } from '../../theme/colors.js';
+import { COLORS, RARITY_COLOR, rarityStyle, readableTextOn } from '../../theme/colors.js';
 import { SectionTitle } from '../shared/SectionTitle.jsx';
 import { DraftView } from './DraftView.jsx';
 import { makePlayer } from '../../engine/factory.js';
 import { rand, choice, generateRarity } from '../../engine/random.js';
 import { RARITY_DEDUCT } from '../../engine/constants.js';
 import { STAR_POSITIONS, TEAMS } from '../../data/teams.js';
+
+// ─── AWARDS VIEW ─────────────────────────────────────────────────────────
+// Reveals 6 awards 1 by 1, at 1-second cadence:
+//   1. Super Bowl Champion (team)
+//   2. Super Bowl MVP (player)
+//   3. Regular Season Offensive MVP (player)
+//   4. Regular Season Defensive MVP (player)
+//   5. Offensive Rookie of the Year (player)
+//   6. Defensive Rookie of the Year (player)
+//
+// Each card animates in. After all 6 are visible, "→ CONTINUE" appears.
+
+const REVEAL_INTERVAL_MS = 1000;
+
+// Format a player's headline stat line based on position.
+const headlineStat = (player) => {
+  const s = player.stats || {};
+  if (player.position === 'QB')                          return `${s.passYds || 0} pass yds · ${s.passTd || 0} TD`;
+  if (player.position === 'WR' || player.position === 'TE') return `${s.recYds || 0} rec yds · ${s.recTd || 0} TD`;
+  if (player.position === 'RB')                          return `${s.rushYds || 0} rush yds · ${s.rushTd || 0} TD`;
+  if (player.position === 'DE')                          return `${s.sacks || 0} sacks · ${s.tackles || 0} tkl`;
+  if (player.position === 'CB')                          return `${s.ints || 0} INT · ${s.tackles || 0} tkl · ${s.pd || 0} PD`;
+  if (player.position === 'K/P')                         return `${s.fgm || 0} FG`;
+  return '';
+};
+
+// ── Team award card (Super Bowl Champion) ──
+const TeamAwardCard = ({ label, team, snapshot }) => {
+  if (!team) return null;
+  const accent = team.color || COLORS.accent;
+  const textOnAccent = readableTextOn(accent);
+  return (
+    <div style={{
+      background: COLORS.panel,
+      borderRadius: 12,
+      overflow: 'hidden',
+      boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
+      border: `1px solid ${COLORS.border}`,
+      animation: 'awardSlide 0.4s ease-out',
+    }}>
+      <div style={{
+        padding: '14px 20px',
+        background: accent,
+        color: textOnAccent,
+        fontSize: 11, letterSpacing: 3, fontWeight: 800,
+      }}>{label}</div>
+      <div style={{ padding: 20, display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div style={{
+          width: 64, height: 64, borderRadius: 10,
+          background: accent, color: textOnAccent,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontFamily: "'Bebas Neue'", fontSize: 22, letterSpacing: 1,
+          fontWeight: 800, flexShrink: 0,
+        }}>{team.id}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 12, letterSpacing: 2, color: COLORS.textMute, fontWeight: 600 }}>
+            {team.city?.toUpperCase()}
+          </div>
+          <div style={{
+            fontFamily: "'Bebas Neue'", fontSize: 32, letterSpacing: 1.5, lineHeight: 1,
+            marginTop: 2,
+          }}>
+            {team.name?.toUpperCase()}
+          </div>
+        </div>
+        {snapshot && (
+          <div style={{ display: 'flex', gap: 18, flexShrink: 0 }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 10, letterSpacing: 1.5, color: COLORS.textMute }}>RECORD</div>
+              <div style={{ fontFamily: "'JetBrains Mono'", fontSize: 18, fontWeight: 800 }}>
+                {snapshot.record.w}-{snapshot.record.l}{snapshot.record.t > 0 ? `-${snapshot.record.t}` : ''}
+              </div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 10, letterSpacing: 1.5, color: COLORS.textMute }}>OVERALL</div>
+              <div style={{ fontFamily: "'JetBrains Mono'", fontSize: 18, fontWeight: 800 }}>
+                {snapshot.overall}
+              </div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 10, letterSpacing: 1.5, color: COLORS.textMute }}>MOMENTUM</div>
+              <div style={{ fontFamily: "'JetBrains Mono'", fontSize: 18, fontWeight: 800 }}>
+                {snapshot.momentum}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ── Player award card ──
+const PlayerAwardCard = ({ label, player, accentColor }) => {
+  if (!player) return null;
+  const team = player.teamId ? TEAMS.find(t => t.id === player.teamId) : null;
+  const accent = accentColor || team?.color || COLORS.accent;
+  const textOnAccent = readableTextOn(accent);
+  return (
+    <div style={{
+      background: COLORS.panel,
+      borderRadius: 12,
+      overflow: 'hidden',
+      boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
+      border: `1px solid ${COLORS.border}`,
+      animation: 'awardSlide 0.4s ease-out',
+    }}>
+      <div style={{
+        padding: '14px 20px',
+        background: accent,
+        color: textOnAccent,
+        fontSize: 11, letterSpacing: 3, fontWeight: 800,
+      }}>{label}</div>
+      <div style={{ padding: 20, display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div style={{
+          width: 64, height: 64, borderRadius: 10,
+          background: team?.color || COLORS.borderMute,
+          color: team ? readableTextOn(team.color) : COLORS.textMute,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontFamily: "'Bebas Neue'", fontSize: 14, letterSpacing: 1,
+          fontWeight: 800, flexShrink: 0,
+        }}>{player.teamId || 'FA'}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+            <span style={{ ...styles.rarityBadge, ...rarityStyle(player.rarity), fontSize: 9 }}>
+              {player.rarity}
+            </span>
+            <span style={{ fontSize: 10, letterSpacing: 1.5, color: COLORS.textMute, fontWeight: 600 }}>
+              {player.position}
+            </span>
+          </div>
+          <div style={{
+            fontFamily: "'Bebas Neue'", fontSize: 28, letterSpacing: 1, lineHeight: 1.05,
+          }}>
+            {player.name}
+          </div>
+          <div style={{ fontSize: 11, color: COLORS.textMute, marginTop: 4, letterSpacing: 0.5 }}>
+            {headlineStat(player)}
+          </div>
+        </div>
+        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+          <div style={{ fontSize: 10, letterSpacing: 1.5, color: COLORS.textMute }}>YEAR</div>
+          <div style={{ fontFamily: "'JetBrains Mono'", fontSize: 18, fontWeight: 800 }}>
+            {(player.yearsIn ?? 0) + 1}<span style={{ opacity: 0.4 }}>/{player.career ?? '?'}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const AwardsView = ({ data, onContinue }) => {
+  const historyEntry = data?.historyEntry || {};
+  const sbMvp = data?.sbMvp;
+
+  // Build the ordered list of awards. We skip any that have no data.
+  const awards = [
+    historyEntry.sbWinner && { kind: 'team', label: '🏆 SUPER BOWL CHAMPION',
+      team: historyEntry.sbWinner, snapshot: historyEntry.sbWinnerSnapshot },
+    sbMvp                  && { kind: 'player', label: '⭐ SUPER BOWL MVP', player: sbMvp,
+      accent: '#FBBF24' },
+    historyEntry.offMvp    && { kind: 'player', label: '🏈 OFFENSIVE MVP', player: historyEntry.offMvp },
+    historyEntry.defMvp    && { kind: 'player', label: '🛡 DEFENSIVE MVP', player: historyEntry.defMvp },
+    historyEntry.offRookie && { kind: 'player', label: '🌱 OFFENSIVE ROOKIE OF THE YEAR', player: historyEntry.offRookie },
+    historyEntry.defRookie && { kind: 'player', label: '🌱 DEFENSIVE ROOKIE OF THE YEAR', player: historyEntry.defRookie },
+  ].filter(Boolean);
+
+  const [revealed, setRevealed] = useState(1);
+
+  useEffect(() => {
+    if (revealed >= awards.length) return;
+    const timer = setTimeout(() => setRevealed(r => r + 1), REVEAL_INTERVAL_MS);
+    return () => clearTimeout(timer);
+  }, [revealed, awards.length]);
+
+  const allRevealed = revealed >= awards.length;
+
+  return (
+    <div>
+      <SectionTitle title="SEASON AWARDS" subtitle={allRevealed ? 'All awards announced' : `Announcing ${revealed} / ${awards.length}`} />
+      <style>{`
+        @keyframes awardSlide {
+          from { opacity: 0; transform: translateY(20px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {awards.slice(0, revealed).map((a, i) => a.kind === 'team'
+          ? <TeamAwardCard   key={i} label={a.label} team={a.team} snapshot={a.snapshot} />
+          : <PlayerAwardCard key={i} label={a.label} player={a.player} accentColor={a.accent} />
+        )}
+      </div>
+      <button
+        onClick={onContinue}
+        disabled={!allRevealed}
+        style={{
+          ...styles.bigBtn, marginTop: 20,
+          opacity: allRevealed ? 1 : 0.4,
+          cursor: allRevealed ? 'pointer' : 'not-allowed',
+        }}
+      >
+        {allRevealed ? '→ CONTINUE TO OFFSEASON' : '◌ awards in progress...'}
+      </button>
+    </div>
+  );
+};
 
 // ─── MOMENTUM CHANGE ROW ─────────────────────────────────────────────────
 const TIER_RANK = { Bottom: 0, Low: 1, Mid: 2, Candidate: 3, Dynasty: 4 };
@@ -83,6 +290,11 @@ export const OffseasonView = ({
   step, setStep, data, setData, league, setLeague,
   freeAgents, setFreeAgents, seasonNum, onComplete,
 }) => {
+  // ── AWARDS STEP ─────────────────────────────────────────────────────
+  if (step === 'awards') {
+    return <AwardsView data={data} onContinue={() => setStep('momentum')} />;
+  }
+
   // ── MOMENTUM STEP ───────────────────────────────────────────────────
   if (step === 'momentum') {
     const changes = (data?.momentumChanges || []);
@@ -94,7 +306,7 @@ export const OffseasonView = ({
     });
     return (
       <div>
-        <SectionTitle title="OFFSEASON" subtitle="STEP 1 · MOMENTUM SHIFTS" />
+        <SectionTitle title="OFFSEASON" subtitle="STEP 2 · MOMENTUM SHIFTS" />
         <div style={styles.detailCard}>
           <h4 style={styles.detailH4}>TEAM MOMENTUM CHANGES ({changed.length})</h4>
           {changed.length === 0 ? (
@@ -122,7 +334,7 @@ export const OffseasonView = ({
   if (step === 'retire') {
     return (
       <div>
-        <SectionTitle title="OFFSEASON" subtitle="STEP 2 · RETIREMENTS" />
+        <SectionTitle title="OFFSEASON" subtitle="STEP 3 · RETIREMENTS" />
         <div style={styles.offGrid}>
           <div style={styles.detailCard}>
             <h4 style={styles.detailH4}>🏁 RETIRING ({data.retirements.length})</h4>
@@ -173,7 +385,7 @@ export const OffseasonView = ({
   if (step === 'fa') {
     return (
       <div>
-        <SectionTitle title="OFFSEASON" subtitle="STEP 3 · FREE AGENCY" />
+        <SectionTitle title="OFFSEASON" subtitle="STEP 4 · FREE AGENCY" />
         <div style={styles.detailCard}>
           <h4 style={styles.detailH4}>RELEASED ({data.releases.length})</h4>
           {data.releases.map((r, i) => {
@@ -227,7 +439,7 @@ export const OffseasonView = ({
   if (step === 'trades') {
     return (
       <div>
-        <SectionTitle title="OFFSEASON" subtitle="STEP 4 · TRADES" />
+        <SectionTitle title="OFFSEASON" subtitle="STEP 5 · TRADES" />
         <div style={styles.detailCard}>
           <h4 style={styles.detailH4}>BLOCKBUSTER TRADES ({data.trades.length})</h4>
           {data.trades.map((t, i) => (
